@@ -60,7 +60,7 @@ import {
 } from "@/api/exhibition";
 
 import { 
-	getDeviceList,addDevice,updateDevice,deleteDevice,updateDeviceLink
+	getDeviceList,addDevice,updateDevice,deleteDevice,updateDeviceLink,probeDevice
 } from "@/api/device";
 
 // --- Types (user-defined, matching API) ---
@@ -394,6 +394,17 @@ export default function ManagePage() {
 		}
 	};
 
+	// --- 设备 手动探活 ---
+	const handleDeviceProbe = async (node: FlowNodeData) => {
+		try {
+			const res = await probeDevice({ device_id: node.id });
+			toast.success(res?.msg || "探活已下发");
+			fetchTree();
+		} catch (e: unknown) {
+			toast.error(e instanceof Error ? e.message : "探活失败");
+		}
+	};
+
 	// --- 设备命令 编辑 ---
 	const handleDeviceControlEdit = (node: FlowNodeData) => {
 		setSelectedDevice({
@@ -405,10 +416,12 @@ export default function ManagePage() {
 	};
  
 	// --- Sidebar 添加节点 ---
+	// 展厅可直接创建；展区/展项允许不带父节点创建（后端 m_p / e_m 为 required=False），
+	// 创建后进入侧栏「未连接」分组，拖到父节点即可建立关联。
 	const handleAddNode = useCallback((kind: "pavilion" | "machine" | "exhibit" | "device") => {
 		if (kind === "pavilion") openPavAdd();
-		// else if (kind === "machine") openMacAdd({ id: 0, label: "", kind: "machine", show: 1 });
-		// else if (kind === "exhibit") openExhAdd({ id: 0, label: "", kind: "exhibit", show: 1 });
+		else if (kind === "machine") openMacAdd(null);
+		else if (kind === "exhibit") openExhAdd(null);
 	}, []);
 
 	// --- 节点连接 ---
@@ -536,9 +549,9 @@ export default function ManagePage() {
 	};
 
 	// --- 展区 新增 dialog open --- 
-	const openMacAdd = (parentNode: FlowNodeData) => {
+	const openMacAdd = (parentNode: FlowNodeData | null) => {
 		setMacEditing(null);
-		setMacForm({ m_name: "", m_p: parentNode.id, m_summary: "", m_re:"", show: 1, sort:0 });
+		setMacForm({ m_name: "", m_p: parentNode?.id ?? null, m_summary: "", m_re:"", show: 1, sort:0 });
 		setMacDialogOpen(true);
 	}
 	// --- 展区 编辑 dialog open ---
@@ -552,12 +565,15 @@ export default function ManagePage() {
 	// --- 展区 编辑/新增 方法 ---
 	const handleMacSave = async () => {
 		try {
+			// 未指定父展厅时省略 m_p（后端 IntegerField 不接受 null，省略即不绑定）
+			const payload: Record<string, unknown> = { ...macForm };
+			if (payload.m_p == null) delete payload.m_p;
 			if (macEditing) {
-				await updateMachine({ id: macEditing.id, ...macForm });
-				toast.success("展项更新成功");
+				await updateMachine({ id: macEditing.id, ...payload });
+				toast.success("展区更新成功");
 			} else {
-				await addMachine(macForm);
-				toast.success("展项添加成功");
+				await addMachine(payload);
+				toast.success("展区添加成功");
 			}
 			setMacDialogOpen(false);
 			fetchTree();
@@ -580,9 +596,9 @@ export default function ManagePage() {
 	};
 
 	// --- 展项 新增 dialog open --- 
-	const openExhAdd = (parentNode: FlowNodeData) => {
+	const openExhAdd = (parentNode: FlowNodeData | null) => {
 		setExhEditing(null);
-		setExhForm({ e_name: "",e_m: parentNode.id, e_summary: "", e_re: "", e_ip: "192.168.1.255",e_base:"1_2_3_4_5_6", show: 1, sort:0 });
+		setExhForm({ e_name: "",e_m: parentNode?.id ?? null, e_summary: "", e_re: "", e_ip: "192.168.1.255",e_base:"1_2_3_4_5_6", show: 1, sort:0 });
 		setExhDialogOpen(true);
 	}
 	// --- 展项 编辑 dialog open --- 
@@ -596,12 +612,15 @@ export default function ManagePage() {
 	// --- 展项 更新/新增 方法 ---
 	const handleExhSave = async () => {
 		try {
+			// 未指定父展区时省略 e_m（同上）
+			const payload: Record<string, unknown> = { ...exhForm };
+			if (payload.e_m == null) delete payload.e_m;
 			if (exhEditing) {
-				await updateExhibit({ id: exhEditing.id, ...exhForm });
-				toast.success("展品更新成功");
+				await updateExhibit({ id: exhEditing.id, ...payload });
+				toast.success("展项更新成功");
 			} else {
-				await addExhibit(exhForm);
-				toast.success("展品添加成功");
+				await addExhibit(payload);
+				toast.success("展项添加成功");
 			}
 			setExhDialogOpen(false);
 			fetchTree();
@@ -790,6 +809,7 @@ export default function ManagePage() {
 					onDeviceControlEdit={handleDeviceControlEdit}
 					onExhibitControlEdit={handleExhibitControlEdit}
 					onContentDownload={handleContentDownload}
+					onDeviceProbe={handleDeviceProbe}
 					onRefresh={fetchTree}
 				/>
 			</div>
@@ -954,8 +974,8 @@ export default function ManagePage() {
 								<Input id="m_summary" type="text" value={macForm.m_summary} placeholder="展区介绍" onChange={(e) => setMacForm({ ...macForm, m_summary: e.target.value })} />
 							</Field>
 							<Field>
-								<FieldLabel htmlFor="m_p">所属展馆 ID</FieldLabel>
-								<Input id="m_p" type="text" value={macForm.m_p} placeholder="所属展馆 ID" onChange={(e) => setMacForm({ ...macForm, m_p: Number(e.target.value) })} disabled/>
+								<FieldLabel htmlFor="m_p">所属展厅 ID</FieldLabel>
+								<Input id="m_p" type="text" value={macForm.m_p ?? ""} placeholder="未绑定（可在画布拖拽关联）" onChange={(e) => setMacForm({ ...macForm, m_p: Number(e.target.value) })} disabled/>
 							</Field>
 							<div className="grid grid-cols-2 gap-4">
 								<Field>
@@ -1011,7 +1031,7 @@ export default function ManagePage() {
 							<div className="grid grid-cols-2 gap-4">
 								<Field>
 									<FieldLabel htmlFor="e_m">展区 ID</FieldLabel>
-									<Input id="e_m" type="number" value={exhForm.e_m} onChange={(e) => setExhForm({ ...exhForm, e_m: Number(e.target.value) })} disabled/>
+									<Input id="e_m" type="number" value={exhForm.e_m ?? ""} placeholder="未绑定（可在画布拖拽关联）" onChange={(e) => setExhForm({ ...exhForm, e_m: Number(e.target.value) })} disabled/>
 								</Field>
 								<Field>
 									<FieldLabel htmlFor="e_ip">展项 IP</FieldLabel>

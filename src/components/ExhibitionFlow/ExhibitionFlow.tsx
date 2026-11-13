@@ -19,7 +19,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import { Loader2, FileIcon } from "lucide-react";
 import { Building2Icon, Columns2, GalleryThumbnails,CodeXml,Code,PanelLeftIcon} from "lucide-react";
-import { PencilIcon, Trash2Icon, PlusIcon, RefreshCwIcon, Maximize, SlidersHorizontal, Send, Terminal } from "lucide-react";
+import { PencilIcon, Trash2Icon, PlusIcon, RefreshCwIcon, Maximize, SlidersHorizontal, Send, Terminal, Wifi, SearchIcon, XIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import ContextMenu from "./ContextMenu" 
 import PavilionNode from "./PavilionNode";
@@ -390,6 +391,8 @@ export interface ExhibitionFlowProps {
     onExhibitControlEdit: (node: FlowNodeData) => void;
     /** 内容：下发文件到设备 */
     onContentDownload: (node: FlowNodeData) => void;
+    /** 设备：手动探活 */
+    onDeviceProbe: (node: FlowNodeData) => void;
     /** 画布右键菜单：重新拉取节点数据 */
     onRefresh?: () => void;
 }
@@ -414,6 +417,7 @@ function ExhibitionFlowInner({
     onDeviceControlEdit,
     onExhibitControlEdit,
     onContentDownload,
+    onDeviceProbe,
     onRefresh,
 }: ExhibitionFlowProps) {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>([]);
@@ -425,10 +429,57 @@ function ExhibitionFlowInner({
  
     const [contextMenu, setContextMenu] = useState(null);
 
+    // ── 节点搜索：命中节点保持高亮，其余变淡；可一键定位 ──
+    const [search, setSearch] = useState("");
+    const searchTerm = search.trim().toLowerCase();
+
+    const matchedIds = useMemo(() => {
+        if (!searchTerm) return null;
+        const ids = new Set<string>();
+        for (const node of nodes) {
+            const data = node.data as Record<string, unknown>;
+            const haystack = [data.label, data.id, data.ip, data.e_ip, data.num, data.summary]
+                .filter((v) => v !== undefined && v !== null && v !== "")
+                .join(" ")
+                .toLowerCase();
+            if (haystack.includes(searchTerm)) ids.add(node.id);
+        }
+        return ids;
+    }, [nodes, searchTerm]);
+
+    // 搜索时只改透明度，不增删节点，避免破坏布局与连线
+    const displayNodes = useMemo(() => {
+        if (!matchedIds) return nodes;
+        return nodes.map((node) => ({
+            ...node,
+            style: { ...node.style, opacity: matchedIds.has(node.id) ? 1 : 0.2 },
+        }));
+    }, [nodes, matchedIds]);
+
+    const displayEdges = useMemo(() => {
+        if (!matchedIds) return edges;
+        return edges.map((edge) => ({
+            ...edge,
+            style: {
+                ...edge.style,
+                opacity: matchedIds.has(edge.source) || matchedIds.has(edge.target) ? 1 : 0.1,
+            },
+        }));
+    }, [edges, matchedIds]);
+
+    const focusMatches = useCallback(() => {
+        if (!matchedIds || matchedIds.size === 0) return;
+        reactFlowInstance.fitView({
+            nodes: nodes.filter((n) => matchedIds.has(n.id)),
+            duration: 400,
+            padding: 0.6,
+        });
+    }, [matchedIds, nodes, reactFlowInstance]);
+
     // Stable callbacks context
     const actions = useMemo<FlowActions>(
-        () => ({ onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onContentDownload }),
-        [onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onContentDownload],
+        () => ({ onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onContentDownload, onDeviceProbe }),
+        [onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onContentDownload, onDeviceProbe],
     );
 
     // Unlinked items (no parent): shown in the sidebar instead of the canvas.
@@ -589,6 +640,7 @@ function ExhibitionFlowInner({
                 actionItems.push({ label: "文件下发", icon: Send, onSelect: () => onContentDownload(node) });
             } else if (node.kind === "device") {
                 actionItems.push({ label: "设备命令", icon: Terminal, onSelect: () => onDeviceControlEdit(node) });
+                actionItems.push({ label: "设备探活", icon: Wifi, onSelect: () => onDeviceProbe(node) });
             }
             if (actionItems.length > 0) {
                 groups.push({ heading: "节点操作", items: actionItems });
@@ -607,7 +659,7 @@ function ExhibitionFlowInner({
                 ],
             },
         ];
-    }, [onAddChild, onAddNode, onContentControlEdit, onContentDownload, onDelete, onDeviceControlEdit, onEdit, onExhibitControlEdit, onRefresh, reactFlowInstance]);
+    }, [onAddChild, onAddNode, onContentControlEdit, onContentDownload, onDelete, onDeviceControlEdit, onDeviceProbe, onEdit, onExhibitControlEdit, onRefresh, reactFlowInstance]);
 
     const onDrop = useCallback(
         (event: DragEvent) => {
@@ -688,9 +740,9 @@ function ExhibitionFlowInner({
                     <ReactFlow
                         ref={ref}
                         // 节点
-                        nodes={nodes} 
+                        nodes={displayNodes} 
                         // 边
-                        edges={edges} 
+                        edges={displayEdges} 
                         // 节点类型
                         nodeTypes={nodeTypes} 
                         // 边类型
@@ -756,6 +808,32 @@ function ExhibitionFlowInner({
                             className="border! border-border!"
                             maskColor="hsl(var(--muted) / 0.3)"
                         />
+                        <Panel position="top-center">
+                            <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2 py-1 shadow-sm">
+                                <SearchIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                                <Input
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="搜索节点名称 / ID / IP"
+                                    className="h-7 w-52 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+                                />
+                                {matchedIds && (
+                                    <span className={`whitespace-nowrap text-xs ${matchedIds.size === 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                                        {matchedIds.size} 个匹配
+                                    </span>
+                                )}
+                                {matchedIds && matchedIds.size > 0 && (
+                                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={focusMatches}>
+                                        定位
+                                    </Button>
+                                )}
+                                {search && (
+                                    <Button variant="ghost" size="icon" className="size-6" title="清空" onClick={() => setSearch("")}>
+                                        <XIcon className="size-3.5" />
+                                    </Button>
+                                )}
+                            </div>
+                        </Panel>
                         <Panel position="top-right">
                             <div className="flex flex-col items-start bg-muted/60 p-2 border rounded-md gap-2 select-none">
                                 <span className="text-muted-foreground text-xs">节点颜色标识</span>

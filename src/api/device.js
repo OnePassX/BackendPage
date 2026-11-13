@@ -7,6 +7,8 @@ export const addDevice = (params) => apiPost('/api/device/add', params);
 export const updateDevice = (params) => apiPut('/api/device/update', params);
 export const deleteDevice = (id) => apiDelete(`/api/device/delete/${id}`);
 export const updateDeviceLink = (params) => apiPut('/api/device/link', params);
+/** 手动触发设备探活（单台）：POST /device/probe { device_id } */
+export const probeDevice = (params) => apiPost('/api/device/probe', params);
 
 // ============ 设备指令码 ============
 export const getCodeList = (params) => apiGet('/api/code/list', params);

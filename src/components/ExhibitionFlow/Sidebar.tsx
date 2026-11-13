@@ -13,7 +13,23 @@ const ITEMS = [
         desc: "展馆",
         color: "text-primary",
         bg: "bg-primary/10 hover:bg-primary/15",
-    }
+    },
+    {
+        kind: "machine" as const,
+        label: "添加展区",
+        icon: Columns2,
+        desc: "不绑定展厅，创建后出现在「未连接展区」，拖到展厅即可关联",
+        color: "text-blue-600",
+        bg: "bg-blue-500/10 hover:bg-blue-500/15",
+    },
+    {
+        kind: "exhibit" as const,
+        label: "添加展项",
+        icon: GalleryThumbnails,
+        desc: "不绑定展区，创建后出现在「未连接展项」，拖到展区即可关联",
+        color: "text-emerald-600",
+        bg: "bg-emerald-500/10 hover:bg-emerald-500/15",
+    },
 ];
 
 // DataTransfer key carrying a dragged unlinked item (JSON { kind, id }).

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { PencilIcon, PlusIcon } from "lucide-react";
+import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -224,7 +224,7 @@ export function DeviceCommandDrawer({ open, onOpenChange, device }: DeviceComman
                         <PencilIcon className="size-4" />
                     </Button>
                     <DeleteDialog
-                        view={<span className="text-sm text-destructive">删除</span>}
+                        view={<Trash2Icon className="size-4 text-destructive" />}
                         label={`确认删除命令「${row.original.name}」？`}
                         onDelete={() => handleDelete(row.original.id)}
                     />

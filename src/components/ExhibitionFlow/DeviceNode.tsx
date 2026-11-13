@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Handle, Position, useConnection, type ConnectionState } from "@xyflow/react";
-import { ImageIcon, PencilIcon, Trash2Icon, MoreHorizontalIcon, CodeXml, Plus } from "lucide-react";
+import { ImageIcon, PencilIcon, Trash2Icon, MoreHorizontalIcon, CodeXml, Plus, Wifi } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -60,6 +60,10 @@ function DeviceNode({ data, selected }) {
                         <DropdownMenuItem onClick={() => actions.onDeviceControlEdit(data)}>
                             <CodeXml className="mr-2 size-4" />
                             编辑硬件控制命令
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => actions.onDeviceProbe(data)}>
+                            <Wifi className="mr-2 size-4" />
+                            设备探活
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
