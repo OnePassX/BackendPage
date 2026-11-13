@@ -13,6 +13,8 @@
 | 16 | 连线成功提示错位 | 第一批 | ✅ 已完成 | 2026-11-13 |
 | 17 | 断开连线判空恒真 / 用错字段 | 第一批 | ✅ 已完成 | 2026-11-13 |
 | 18 | 死代码：`getControlList` 导入、`handleContentControlSave` | 第一批 | ✅ 已完成 | 2026-11-13 |
+| 2 | 节点上的快捷添加按钮是假按钮 | 第二批 | ✅ 已完成 | 2026-11-13 |
+| 6 | 文件上传未接线（`FileUpload` 零输出） | 第二批 | ✅ 已完成 | 2026-11-13 |
 
 后续批次（1/2/3/6、7/9/10、8/13/14）在开工时追加到本文件。
 
@@ -204,6 +206,104 @@
 
 ---
 
+# 第二批（2026-11-13）
+
+## 2. 节点上的快捷添加按钮是假按钮
+
+- **状态**：✅ 已完成
+- **位置**：`src/components/ExhibitionFlow/PavilionNode.tsx`、`ExhibitNode.tsx`
+
+**现象**
+节点底部有两个圆形「+」按钮（展区 / 内容 / 设备）。展厅节点的「展区」「设备」按钮正常，
+但展项节点的「内容」按钮点下去只弹 `window.alert("Handle button has been clicked!")`。
+
+**原因**
+两个文件顶部都留着一个模板函数：
+
+```tsx
+const onClick = () => { window.alert(`Handle button has been clicked!`); };
+```
+
+- `PavilionNode.tsx`：两个按钮已经改成 `actions.onAddChild(data, 'machine' | 'device')`，
+  这个 `onClick` **从未被引用**，是纯死代码。
+- `ExhibitNode.tsx`：设备按钮已正确接线，但「内容」按钮仍在用这个 `onClick`。
+
+**改动**
+1. `PavilionNode.tsx`：删除未使用的 `onClick`，并去掉随之无用的 `PlusIcon` 导入。
+2. `ExhibitNode.tsx`：删除 `onClick`，把「内容」按钮接到既有的子节点动作上
+   （与同文件「设备」按钮、与 `PavilionNode` 的写法保持一致）：
+
+```diff
+- <Button onClick={onClick} …>
++ <Button onClick={() => actions.onAddChild(data, "content")} …>
+```
+
+该动作经 `FlowActions.onAddChild` → `main.tsx` 的 `handleAddChild` 分发到
+`node.kind === "exhibit" && type === "content"` → `openContentAdd(node)`，
+即打开内容新增弹窗（e_id 自动填当前展项）。
+
+同时去掉 `ExhibitNode` 里无用的 `FileIcon` 导入。
+
+**验证**
+- `tsc`：错误数 8 → 7（顺带消掉了 `onAddNode` 的联合类型不匹配，见下方「附带改动」）。
+- 手工：展项节点点「内容」→ 弹出新增内容弹窗，且「所属展项」已带上。
+
+## 6. 文件上传未接线（`FileUpload` 零输出）
+
+- **状态**：✅ 已完成
+- **位置**：`src/components/upload-file.tsx`、`src/app/main.tsx` 内容弹窗
+
+**现象**
+内容弹窗里的上传区域可以选文件、也会提示"上传成功"，但保存后内容仍然没有文件：
+`c_file_name` / `c_file_addr` 从未被写入表单。另外这个组件本身也上传不了——
+它用裸 `XMLHttpRequest` 打 `http://127.0.0.1:8000/api/upload/`（不是后端地址），
+请求头写成 `X‑CSRFToken`（U+2011 非断行连字符，浏览器会直接抛错），且不带会话凭据。
+
+**原因**
+1. `FileUpload` 的接口只有 `{ accept, maxSize }`，**没有任何输出**，父组件拿不到上传结果；
+2. 组件自己实现了一套上传协议，绕过了 transport，与 `content.tsx` 里的正确实现重复；
+3. 组件内的 class 名也混入了 U+2011（`space‑y‑1`、`text-muted‑foreground`、`flex‑1`），样式不生效。
+
+**改动**
+1. **重写 `upload-file.tsx`**，改为受控输出、走 transport：
+
+| 项 | 改动前 | 改动后 |
+|---|---|---|
+| 上传实现 | 裸 XHR + 硬编码 `127.0.0.1:8000` | `apiUploadContent`（经 apiClient，自动带 cookie / CSRF / 错误归一） |
+| 输出 | 无 | `onUploaded({name, url})`、`onClear()`、`onUploadingChange(bool)` |
+| 回显 | 无 | `value` / `fileName` 两个受控 prop，编辑时显示已有文件 |
+| 取消 | 无 | `AbortController`，换文件/卸载时中断，并用请求身份判断避免旧请求覆盖新请求状态 |
+| 进度 | 有（但请求发不出去） | 复用 transport 的 `onUploadProgress` |
+| class 名 | 含 U+2011 | 修正为正常连字符 |
+
+   后端 `/upload/uploadContent` 返回 `{ code, msg, url, name }`（无 `data` 包装），
+   组件按 `res.name` / `res.url` 回填，与 `content.tsx` 的读法一致。
+
+2. **在 `main.tsx` 内容弹窗接线**：
+
+```diff
+- <FileUpload accept=".jpg,.png,.jpeg,.pdf,.mp4,.zip,.pptx" maxSize={5 * 1024 * 1024 * 1024}/>
++ <FileUpload
++     accept=".jpg,.png,.jpeg,.pdf,.mp4,.zip,.pptx"
++     maxSize={5 * 1024 * 1024 * 1024}
++     value={contentFormData.c_file_addr}
++     fileName={contentFormData.c_file_name}
++     onUploaded={({ name, url }) => setContentFormData((prev) => ({ ...prev, c_file_name: name, c_file_addr: url }))}
++     onClear={() => setContentFormData((prev) => ({ ...prev, c_file_name: "", c_file_addr: "" }))}
++ />
+```
+
+**验证**
+- `tsc`：无新增错误。
+- 手工：内容弹窗选文件 → 进度条走完 → 显示文件名与地址 → 保存 → 重新打开仍显示该文件。
+- 手工：编辑已有内容时上传区域显示原文件名/地址；点「清空文件」后保存，文件字段被清空。
+
+**附带改动（工作区里已有的未提交修改，一并提交）**
+- `main.tsx`：`handleAddNode` 的参数联合类型补上 `"device"`，消掉既有的 `TS2322`。
+- `ExhibitionFlow.tsx`：删除一处多余空行。
+
+---
+
 # 第一批验证汇总
 
 | 项目 | 改动前 | 改动后 |
@@ -225,8 +325,18 @@
 
 | 编号 | 缺口 | 说明 |
 |---|---|---|
-| 19 | 内容弹窗「文件地址」标签写错 | 实为存储位置（`c_file_status`），留待第二批与表单联动一起改 |
+| 19 | 内容弹窗「文件地址」标签写错 | 实为存储位置（`c_file_status`），留待与表单联动一起改 |
 | 20 | `major`（是否为主内容设备）不可编辑 | 当前是 disabled 文本输入 |
-| 1–3、6 | 设备命令 Drawer、节点快捷添加、右键菜单、文件上传接线 | 第二批 |
+| 1、3 | 设备命令 Drawer、右键菜单 | 第二批剩余项 |
 | 7、9、10 | 侧栏添加类型、内容表单联动、显示状态快捷切换 | 第三批 |
 | 8、13、14 | e_link 入口、搜索、字典接后端 | 单独评估 |
+
+**本轮新发现（需后端/产品确认，暂不处理）**
+
+- 内容存储位置 `c_file_status` 前端给了 3 个选项（服务器存储 / 展项电脑存储 / 其他 = 1/2/3），
+  但后端 `C_InfoOpSerializer` 限制 `max_value=2`，选「其他」保存会报
+  「文件状态值在1~2之间」。模型 `Content_Info.FILE_STATUS` 本身有第 3 项，
+  属于后端校验与模型不一致，需要确认以哪边为准。
+- 设备命令编辑（#1）在画布上仍是空入口：`handleDeviceControlEdit` 为空函数，
+  且 `main.tsx` 里只有一行「设备 命令管理 Drawer」注释占位。
+

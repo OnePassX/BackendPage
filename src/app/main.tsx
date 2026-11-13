@@ -366,7 +366,7 @@ export default function ManagePage() {
 	}
  
 	// --- Sidebar 添加节点 ---
-	const handleAddNode = useCallback((kind: "pavilion" | "machine" | "exhibit") => {
+	const handleAddNode = useCallback((kind: "pavilion" | "machine" | "exhibit" | "device") => {
 		if (kind === "pavilion") openPavAdd();
 		// else if (kind === "machine") openMacAdd({ id: 0, label: "", kind: "machine", show: 1 });
 		// else if (kind === "exhibit") openExhAdd({ id: 0, label: "", kind: "exhibit", show: 1 });
@@ -1105,7 +1105,22 @@ export default function ManagePage() {
 								</Field>
 							</div>
 
-							<FileUpload accept=".jpg,.png,.jpeg,.pdf,.mp4,.zip,.pptx" maxSize={5 * 1024 * 1024 * 1024}/>
+							<FileUpload
+								accept=".jpg,.png,.jpeg,.pdf,.mp4,.zip,.pptx"
+								maxSize={5 * 1024 * 1024 * 1024}
+								value={contentFormData.c_file_addr}
+								fileName={contentFormData.c_file_name}
+								onUploaded={({ name, url }) => setContentFormData((prev) => ({
+									...prev,
+									c_file_name: name,
+									c_file_addr: url,
+								}))}
+								onClear={() => setContentFormData((prev) => ({
+									...prev,
+									c_file_name: "",
+									c_file_addr: "",
+								}))}
+							/>
 
 							<div className="grid grid-cols-2 gap-4">
 								<Field orientation="horizontal" className="flex items-center">

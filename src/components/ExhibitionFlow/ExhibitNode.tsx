@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Handle, Position, useConnection, type ConnectionState } from "@xyflow/react";
-import { GalleryThumbnails, PencilIcon, Trash2Icon, MoreHorizontalIcon, FileIcon, Plus } from "lucide-react";
+import { GalleryThumbnails, PencilIcon, Trash2Icon, MoreHorizontalIcon, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonHandle } from "@/components/xyflow/button-handle";
@@ -12,10 +12,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useFlowActions } from "./flowContext";
-
-const onClick = () => {
-    window.alert(`Handle button has been clicked!`);
-};
 
 const selector = (connection: ConnectionState) => {
     return connection.inProgress;
@@ -109,7 +105,7 @@ function ExhibitNode({ data, selected }) {
                 title={'内容'}
             >
                 <Button
-                    onClick={onClick}
+                    onClick={() => actions.onAddChild(data, "content")}
                     size="xs"
                     variant="secondary"
                     className="size-6! rounded-full!"

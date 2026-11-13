@@ -494,7 +494,6 @@ function ExhibitionFlowInner({
     );
 
     // ── Sidebar add handler ──
-
     const handleSidebarAdd = useCallback(
         (kind: "pavilion" | "machine" | "exhibit") => {
             onAddNode?.(kind);

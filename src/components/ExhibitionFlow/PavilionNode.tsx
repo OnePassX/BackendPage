@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Position, useConnection, type ConnectionState } from "@xyflow/react";
-import { Building2Icon, MoreHorizontalIcon, PlusIcon, PencilIcon, Trash2Icon, Plus } from "lucide-react";
+import { Building2Icon, MoreHorizontalIcon, PencilIcon, Trash2Icon, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -13,10 +13,6 @@ import {
 import { ButtonHandle } from "@/components/xyflow/button-handle"
 // import type { FlowNodeData } from "./types";
 import { useFlowActions } from "./flowContext";
-
-const onClick = () => {
-	window.alert(`Handle button has been clicked!`);
-};
 
 const selector = (connection: ConnectionState) => {
 	return connection.inProgress;
