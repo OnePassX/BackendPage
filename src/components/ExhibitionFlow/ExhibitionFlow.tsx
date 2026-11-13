@@ -19,6 +19,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { Loader2, FileIcon } from "lucide-react";
 import { Building2Icon, Columns2, GalleryThumbnails,CodeXml,Code,PanelLeftIcon} from "lucide-react";
+import { PencilIcon, Trash2Icon, PlusIcon, RefreshCwIcon, Maximize, SlidersHorizontal, Send, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ContextMenu from "./ContextMenu" 
 import PavilionNode from "./PavilionNode";
@@ -389,6 +390,8 @@ export interface ExhibitionFlowProps {
     onExhibitControlEdit: (node: FlowNodeData) => void;
     /** 内容：下发文件到设备 */
     onContentDownload: (node: FlowNodeData) => void;
+    /** 画布右键菜单：重新拉取节点数据 */
+    onRefresh?: () => void;
 }
 
 // ── Inner component (needs ReactFlowProvider context) ──
@@ -411,6 +414,7 @@ function ExhibitionFlowInner({
     onDeviceControlEdit,
     onExhibitControlEdit,
     onContentDownload,
+    onRefresh,
 }: ExhibitionFlowProps) {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -515,28 +519,95 @@ function ExhibitionFlowInner({
     }, []);
 
     const onPaneClick = useCallback(() => setContextMenu(null), [setContextMenu]);
-    
+
+    /**
+     * 打开右键菜单。
+     * 菜单贴在鼠标位置，靠近右/下边缘时改用 right/bottom 定位，避免超出画布。
+     */
+    const openContextMenu = useCallback((event: MouseEvent | React.MouseEvent, node?: FlowNodeData) => {
+        event.preventDefault();
+        const pane = ref.current?.getBoundingClientRect();
+        if (!pane) return;
+        setContextMenu({
+            kind: node ? "node" : "pane",
+            node: node ?? null,
+            top: event.clientY < pane.height - 200 ? event.clientY - pane.top : false,
+            left: event.clientX < pane.width - 200 ? event.clientX - pane.left : false,
+            right: event.clientX >= pane.width - 200 ? pane.width - event.clientX + pane.left : false,
+            bottom: event.clientY >= pane.height - 200 ? pane.height - event.clientY + pane.top : false,
+        });
+    }, [setContextMenu]);
+
     const onPaneContextMenu = useCallback(
-        (event: MouseEvent | React.MouseEvent) => {
-            event.preventDefault();
-            const pane = ref.current.getBoundingClientRect();
-            // console.log(event,pane);
-            setContextMenu({
-                top: event.clientY < pane.height - 200 && event.clientY - pane.top,
-                left: event.clientX < pane.width - 200 && event.clientX - pane.left,
-                right: event.clientX >= pane.width - 200 && pane.width - event.clientX + pane.left,
-                bottom: event.clientY >= pane.height - 200 && pane.height - event.clientY + pane.top,
-            });
-        },
-        [setContextMenu],
+        (event: MouseEvent | React.MouseEvent) => openContextMenu(event),
+        [openContextMenu],
     );
 
+    // xyflow 的 onNodeContextMenu 回调签名是 (event, node)
     const onNodeContextMenu = useCallback(
-        (event: MouseEvent | React.MouseEvent) => { 
-            event.preventDefault();
-        },
-        [onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit],
+        (event: MouseEvent | React.MouseEvent, node: Node<FlowNodeData>) => openContextMenu(event, node?.data),
+        [openContextMenu],
     );
+
+    /**
+     * 按上下文组装菜单：
+     * - 空白画布：只能做「不依赖父节点」的事（加展厅、刷新、适应视图）
+     * - 节点：编辑/删除 + 该类型可添加的子节点 + 该类型的专属动作
+     */
+    const buildContextGroups = useCallback((menu: { kind: "pane" | "node"; node: FlowNodeData | null }) => {
+        if (menu.kind === "node" && menu.node) {
+            const node = menu.node;
+            const groups = [
+                {
+                    heading: "节点",
+                    items: [
+                        { label: "编辑节点", icon: PencilIcon, onSelect: () => onEdit(node) },
+                        { label: "删除节点", icon: Trash2Icon, destructive: true, onSelect: () => onDelete(node) },
+                    ],
+                },
+            ];
+
+            const childItems = [];
+            if (node.kind === "pavilion") {
+                childItems.push({ label: "添加展区", icon: PlusIcon, onSelect: () => onAddChild(node, "machine") });
+                childItems.push({ label: "添加设备", icon: PlusIcon, onSelect: () => onAddChild(node, "device") });
+            } else if (node.kind === "machine") {
+                childItems.push({ label: "添加展项", icon: PlusIcon, onSelect: () => onAddChild(node, "exhibit") });
+            } else if (node.kind === "exhibit") {
+                childItems.push({ label: "添加内容", icon: PlusIcon, onSelect: () => onAddChild(node, "content") });
+                childItems.push({ label: "添加设备", icon: PlusIcon, onSelect: () => onAddChild(node, "device") });
+            }
+            if (childItems.length > 0) {
+                groups.push({ heading: "添加子节点", items: childItems });
+            }
+
+            const actionItems = [];
+            if (node.kind === "exhibit") {
+                actionItems.push({ label: "编辑快捷控制", icon: SlidersHorizontal, onSelect: () => onExhibitControlEdit(node) });
+            } else if (node.kind === "content") {
+                actionItems.push({ label: "编辑软件控制命令", icon: Code, onSelect: () => onContentControlEdit(node) });
+                actionItems.push({ label: "文件下发", icon: Send, onSelect: () => onContentDownload(node) });
+            } else if (node.kind === "device") {
+                actionItems.push({ label: "设备命令", icon: Terminal, onSelect: () => onDeviceControlEdit(node) });
+            }
+            if (actionItems.length > 0) {
+                groups.push({ heading: "节点操作", items: actionItems });
+            }
+
+            return groups;
+        }
+
+        return [
+            {
+                heading: "画布",
+                items: [
+                    { label: "添加展厅", icon: Building2Icon, onSelect: () => onAddNode?.("pavilion") },
+                    { label: "刷新节点", icon: RefreshCwIcon, onSelect: () => onRefresh?.() },
+                    { label: "适应视图", icon: Maximize, onSelect: () => reactFlowInstance.fitView({ duration: 300 }) },
+                ],
+            },
+        ];
+    }, [onAddChild, onAddNode, onContentControlEdit, onContentDownload, onDelete, onDeviceControlEdit, onEdit, onExhibitControlEdit, onRefresh, reactFlowInstance]);
 
     const onDrop = useCallback(
         (event: DragEvent) => {
@@ -733,7 +804,14 @@ function ExhibitionFlowInner({
                         </Controls> */}
                         {
                             contextMenu && (
-                                <ContextMenu {...contextMenu}/>
+                                <ContextMenu
+                                    top={contextMenu.top}
+                                    left={contextMenu.left}
+                                    right={contextMenu.right}
+                                    bottom={contextMenu.bottom}
+                                    groups={buildContextGroups(contextMenu)}
+                                    onClose={() => setContextMenu(null)}
+                                />
                             )
                         }
                     </ReactFlow>

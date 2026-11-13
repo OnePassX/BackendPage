@@ -19,6 +19,8 @@
 | 19 | 内容弹窗「文件地址」标签写错 | 第三批（部分） | ✅ 已完成 | 2026-11-13 |
 | 21 | 展项节点缺「编辑快捷控制」入口（e_link） | 第四批 | ✅ 已完成 | 2026-11-13 |
 | 22 | 内容节点缺「文件下发」入口 | 第四批 | ✅ 已完成 | 2026-11-13 |
+| 1 | 设备命令编辑完全没实现 | 第五批 | ✅ 已完成 | 2026-11-13 |
+| 3 | 右键菜单 8 个条目全无 handler | 第六批 | ✅ 已完成 | 2026-11-13 |
 
 后续批次（1/2/3/6、7/9/10、8/13/14）在开工时追加到本文件。
 
@@ -479,6 +481,106 @@ const isUploadableType = [1, 2, 3, 4, 6].includes(contentFormData.c_file_type);
 
 ---
 
+# 第五批：设备命令 Drawer（2026-11-13）
+
+## 1. 设备命令编辑
+
+- **状态**：✅ 已完成
+- **位置**：`src/components/device-command-drawer.tsx`（新增）、`main.tsx`
+
+**现象**
+设备节点下拉菜单里的「设备命令」点了没反应：`handleDeviceControlEdit` 是空函数，
+`main.tsx` 里只有一行「设备 命令管理 Drawer」注释占位。
+
+**原因**
+Drawer 与命令表格都没实现，`FlowActions.onDeviceControlEdit` 只连到了一个空回调。
+
+**改动**
+
+1. 新增 `src/components/device-command-drawer.tsx`，数据来源与展示结构参照
+   `src/app/device/code.tsx`：
+
+| 项 | 实现 |
+|---|---|
+| 数据过滤 | `getCodeList({ device: <设备id>, page: 1, limit: 1000 })`，后端 `CodeViewSet.list` 支持 `device` 参数 |
+| 表格 | 复用 `DataTable`：ID / 命令名称 / 命令原文 / 端口号 / 类型 / 格式 / 控制协议 / 创建时间 / 操作 |
+| 新增/编辑 | Dialog，字段与 `code.tsx` 一致：命令名称、类型、格式、通信协议、端口、控制命令、备注；设备固定为当前节点 |
+| 删除 | 复用 `DeleteDialog`（替代 `code.tsx` 里的原生 `confirm()`） |
+| 下拉选项 | `CodeTypeItems` / `CodeFormatItems` / `CodeProtocalItems` 与 `code.tsx` 保持一致 |
+
+2. `main.tsx`：新增 `selectedDevice` / `deviceCommandDrawerOpen` 状态，
+   `handleDeviceControlEdit` 把节点映射成 `{ id, name, ip }` 并打开 Drawer。
+
+**验证**
+- `tsc`：7 → 6 个错误（`handleDeviceControlEdit` 不再有空参数，该 TS6133 消失）。
+- 手工（待浏览器确认）：
+  1. 设备节点「⋮」→「设备命令」→ 右侧 Drawer 打开，标题是设备名、副标题是设备 IP；
+  2. 表格只显示该设备的命令；
+  3. 新增/编辑/删除命令后列表即时刷新；
+  4. 关闭再打开仍是同一设备的命令。
+
+---
+
+# 第六批：右键菜单（2026-11-13）
+
+## 3. 右键菜单 8 个条目全无 handler
+
+- **状态**：✅ 已完成
+- **位置**：`src/components/ExhibitionFlow/ContextMenu.tsx`、`ExhibitionFlow.tsx`
+
+**现象**
+右键画布会弹出菜单，但 8 个条目（添加展厅/展区/展项/设备/内容、刷新所有节点、
+视口重置、锁定节点）都没有 `onClick`，点了没有任何反应。
+
+**原因**
+`ContextMenu.tsx` 只是静态渲染 `CommandItem`，没有接收任何回调；
+`ExhibitionFlow` 的 `onNodeContextMenu` 也只做了 `preventDefault()`。
+
+**设计取舍（本次采用的方案）**
+
+原菜单把「添加展厅/展区/展项/设备/内容」平铺在一起，但这些动作的**前置条件不同**：
+展区必须有展厅、展项必须有展区、内容必须有展项。空白画布上没有父节点，
+所以从画布右键「添加展项」在语义上不成立。因此按上下文拆成两套菜单：
+
+| 上下文 | 菜单项 | 说明 |
+|---|---|---|
+| **空白画布** | 添加展厅 | 唯一不依赖父节点的添加动作 |
+| | 刷新节点 | 重新拉取 `fetchTree` |
+| | 适应视图 | `fitView()`（原「视口重置」） |
+| **节点** | 编辑节点 / 删除节点 | 通用 |
+| | 添加子节点 | 按类型给：展厅→展区/设备；展区→展项；展项→内容/设备 |
+| | 节点操作 | 展项→编辑快捷控制；内容→编辑软件控制命令、文件下发；设备→设备命令 |
+
+**移出菜单的功能及理由**
+
+| 原条目 | 处理 | 理由 |
+|---|---|---|
+| 添加展区 / 展项 / 设备 / 内容（画布级） | 移除 | 缺父节点上下文，改到「节点 → 添加子节点」，与节点上的「+」按钮同义 |
+| 锁定节点 | 移除 | 没有数据模型与后端字段，只能是纯前端临时状态，刷新即丢失；若确实需要应作为独立功能（含持久化）设计 |
+| 视口重置 | 改名「适应视图」 | 原按钮语义模糊；实现为 `fitView()` |
+
+**改动**
+
+1. `ContextMenu.tsx`：改为接收 `groups: { heading, items: { label, icon?, onSelect, destructive? }[] }`，
+   只负责定位、搜索过滤、点击后关闭；同时修掉把 `false` 直接塞进 `style` 的问题。
+2. `ExhibitionFlow.tsx`：
+   - 抽出 `openContextMenu(event, node?)`，空白画布与节点共用同一套边缘定位逻辑；
+   - `onNodeContextMenu` 接 xyflow 的 `(event, node)` 签名，把节点数据带进菜单；
+   - `buildContextGroups` 按上下文组装菜单；
+   - 新增 `onRefresh` 属性，供「刷新节点」使用（`main.tsx` 传 `fetchTree`）。
+3. `main.tsx`：`<ExhibitionFlow onRefresh={fetchTree} />`。
+
+**验证**
+- `tsc`：6 个错误（与改动前一致）。
+- `npm run lint`：131 → 116 warnings（右键菜单里 9 个未使用的 UI 导入被删除）。
+- 手工（待浏览器确认）：
+  1. 空白画布右键 → 只有「添加展厅 / 刷新节点 / 适应视图」三项，且都能用；
+  2. 节点右键 → 「编辑节点 / 删除节点」+ 该类型的「添加子节点」+ 专属操作；
+  3. 点击菜单项后菜单关闭，动作生效；
+  4. 菜单可用输入框过滤（如输入「设备」只剩设备相关项）。
+
+---
+
 # 第一批验证汇总
 
 | 项目 | 改动前 | 改动后 |
@@ -501,9 +603,8 @@ const isUploadableType = [1, 2, 3, 4, 6].includes(contentFormData.c_file_type);
 | 编号 | 缺口 | 说明 |
 |---|---|---|
 | 20 | `major`（是否为主内容设备）不可编辑 | 当前是 disabled 文本输入 |
-| 1、3 | 设备命令 Drawer、右键菜单 | 第二批剩余项 |
 | 7、10 | 侧栏添加类型、显示状态快捷切换 | 第三批剩余项 |
-| 8、13、14 | e_link 入口、搜索、字典接后端 | 单独评估 |
+| 13、14 | 搜索、字典接后端 | 单独评估 |
 
 **已解决 / 待确认**
 

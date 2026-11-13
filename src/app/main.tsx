@@ -50,6 +50,7 @@ import { DataTable } from "@/components/data-table";
 
 import ExhibitionFlow from "@/components/ExhibitionFlow/ExhibitionFlow";
 import ExhibitionLinkFlow from "@/components/ExhibitionLinkFlow/ExhibitionLinkFlow";
+import { DeviceCommandDrawer } from "@/components/device-command-drawer";
 import type { FlowNodeData } from "@/components/ExhibitionFlow/types";
 import {
 	getPavilionList, addPavilion, updatePavilion, deletePavilion,
@@ -245,6 +246,10 @@ export default function ManagePage() {
 	const [selectedExhibitControl, setSelectedExhibitControl] = useState<any>(null);
 	const [exhibitControlDrawerOpen, setExhibitControlDrawerOpen] = useState(false);
 
+	// 设备命令 Drawer
+	const [selectedDevice, setSelectedDevice] = useState<{ id: number; name: string; ip?: string } | null>(null);
+	const [deviceCommandDrawerOpen, setDeviceCommandDrawerOpen] = useState(false);
+
 	const [contentDialogOpen, setContentDialogOpen] = useState(false);
 	const [contentEditing, setContentEditing] = useState<ContentItem | null>(null);
 	// 与 exhibition/content.tsx 的 defaultForm 保持一致
@@ -390,9 +395,14 @@ export default function ManagePage() {
 	};
 
 	// --- 设备命令 编辑 ---
-	const handleDeviceControlEdit = (node: FlowNodeData) =>{
-
-	}
+	const handleDeviceControlEdit = (node: FlowNodeData) => {
+		setSelectedDevice({
+			id: node.id,
+			name: node.label,
+			ip: typeof node.ip === "string" ? node.ip : undefined,
+		});
+		setDeviceCommandDrawerOpen(true);
+	};
  
 	// --- Sidebar 添加节点 ---
 	const handleAddNode = useCallback((kind: "pavilion" | "machine" | "exhibit" | "device") => {
@@ -780,6 +790,7 @@ export default function ManagePage() {
 					onDeviceControlEdit={handleDeviceControlEdit}
 					onExhibitControlEdit={handleExhibitControlEdit}
 					onContentDownload={handleContentDownload}
+					onRefresh={fetchTree}
 				/>
 			</div>
 
@@ -864,6 +875,11 @@ export default function ManagePage() {
 			</Drawer>
 
 			{/* 设备 命令管理 Drawer */}
+			<DeviceCommandDrawer
+				open={deviceCommandDrawerOpen}
+				onOpenChange={setDeviceCommandDrawerOpen}
+				device={selectedDevice}
+			/>
 
 			{/* --- 展厅 编辑/新增 Dialog --- */}
 			<Dialog open={pavDialogOpen} onOpenChange={setPavDialogOpen}>
