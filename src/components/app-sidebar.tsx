@@ -31,9 +31,9 @@ import {
     CollapsibleTrigger,
     CollapsibleContent,
 } from "@/components/ui/collapsible"
-import { TOKEN_KEY } from "@/api/apiClient"
-import { getRoleMenus } from "@/api/system";
 import { getMenuSidebar } from "@/api/menu";
+import { getSession, signOut } from "@/api/session";
+import { useSession } from "@/hooks/use-session";
 
 // ── Types ──
 
@@ -236,18 +236,31 @@ export function AppSidebar({
 }: React.ComponentProps<typeof Sidebar>) {
     const navigate = useNavigate()
     const location = useLocation()
-    const username = localStorage.getItem("backend_username") || "admin"
-    const rolename = localStorage.getItem("backend_rolename") || "管理员"
-    const roleid = localStorage.getItem("backend_roleid") || "1"
+    // 身份来自 session module，不再各自读 localStorage
+    const session = useSession()
+    const username = session?.displayName || session?.username || "未登录"
+    const rolename = session?.roleName || "未分配角色"
 
     const [items, setItems] = React.useState<SidebarItem[]>([])
     const [loading, setLoading] = React.useState(true)
- 
+
     const fetchMenus = React.useCallback(async () => {
+        // 每次请求都从 session 现读角色，避免 useCallback([]) 捕获首帧角色导致换角色后菜单不刷新
+        const current = getSession()
+        if (!current) {
+            setItems([])
+            setLoading(false)
+            return
+        }
+        // 后端要求 role id；无角色的账号没有菜单可显示
+        if (current.roleId == null) {
+            setItems([])
+            setLoading(false)
+            return
+        }
         try {
-            const res = await getMenuSidebar({id: roleid})
+            const res = await getMenuSidebar({ id: current.roleId })
             const raw = res.data
-            // console.log(res.data)
             const list: ApiMenu[] = Array.isArray(raw) ? raw : []
             setItems(buildItems(list))
         } catch {
@@ -259,7 +272,7 @@ export function AppSidebar({
 
     React.useEffect(() => {
         fetchMenus()
-    }, [fetchMenus])
+    }, [fetchMenus, session?.roleId])
 
     React.useEffect(() => {
         const id = setInterval(fetchMenus, 30000)
@@ -267,11 +280,7 @@ export function AppSidebar({
     }, [fetchMenus])
 
     const handleLogout = () => {
-        localStorage.removeItem(TOKEN_KEY)
-        localStorage.removeItem("backend_username")
-        localStorage.removeItem("backend_roleid")
-        localStorage.removeItem("backend_rolename")
-        navigate("/server/login", { replace: true })
+        signOut()
     }
 
     return (

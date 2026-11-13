@@ -1,15 +1,13 @@
-import { apiDelete, apiGet, apiPost, apiPut,apiUploadContent } from './apiClient';
+import { apiDelete, apiGet, apiPost, apiPut, apiUploadContent } from './apiClient';
 
 // ============ 展馆 ============
 export const getPavilionList = (params) => apiGet('/api/pavilion/list', params);
-export const getPavilionDetail = (id) => apiGet(`/api/pavilion/edit/${id}`);
 export const addPavilion = (params) => apiPost('/api/pavilion/add', params);
 export const updatePavilion = (params) => apiPut('/api/pavilion/update', params);
 export const deletePavilion = (id) => apiDelete(`/api/pavilion/delete/${id}`);
 
 // ============ 展区 ============
 export const getMachineList = (params) => apiGet('/api/machine/list', params);
-export const getMachineDetail = (id) => apiGet(`/api/machine/edit/${id}`);
 export const addMachine = (params) => apiPost('/api/machine/add', params);
 export const updateMachine = (params) => apiPut('/api/machine/update', params);
 export const deleteMachine = (id) => apiDelete(`/api/machine/delete/${id}`);
@@ -18,7 +16,6 @@ export const updateMachineLink = (params) => apiPut('/api/machine/link', params)
 // ============ 展项 ============
 export const getExhibitTree = (params) => apiGet(`/api/exhibition/tree`, params);
 export const getExhibitList = (params) => apiGet('/api/exhibition/list', params);
-export const getExhibitDetail = (id) => apiGet(`/api/exhibition/edit/${id}`);
 export const addExhibit = (params) => apiPost('/api/exhibition/add', params);
 export const updateExhibit = (params) => apiPut('/api/exhibition/update', params);
 export const deleteExhibit = (id) => apiDelete(`/api/exhibition/delete/${id}`);
@@ -27,7 +24,6 @@ export const updateExhibitControl = (params) => apiPut('/api/exhibition/control'
 
 // ============ 内容(文件) ============
 export const getContentList = (params) => apiGet('/api/content/list', params);
-export const getContentDetail = (id) => apiGet(`/api/content/edit/${id}`);
 export const addContent = (params) => apiPost('/api/content/add', params);
 export const updateContent = (params) => apiPut('/api/content/update', params);
 export const deleteContent = (id) => apiDelete(`/api/content/delete/${id}`);
@@ -42,7 +38,6 @@ export const uploadContentFile = (params) => apiUploadContent(params);
 export const getControlTree = (params) => apiGet('/api/control/tree', params);
 export const getControlList = (params) => apiGet('/api/control/list', params);
 export const addControl = (params) => apiPost('/api/control/add', params);
-export const batchAddControl = (params) => apiPost(`/api/control/adds`,params);
+export const batchAddControl = (params) => apiPost(`/api/control/adds`, params);
 export const updateControl = (params) => apiPut('/api/control/update', params);
 export const deleteControl = (id) => apiDelete(`/api/control/delete/${id}`);
-export const sendControl = (params) => apiPost('/api/control/send', null, params);

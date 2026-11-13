@@ -1,22 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { LoaderIcon, RefreshCwIcon } from "lucide-react";
+import { LoaderIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
-  FieldSeparator,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { login as loginApi } from "@/api/auth";
-import { TOKEN_KEY } from "@/api/apiClient";
-import { mediaUrl } from "@/api/apiClient";
+import { signIn } from "@/api/session";
 
 export function LoginForm({
   className,
@@ -27,23 +23,6 @@ export function LoginForm({
   const [password, setPassword] = useState("123456");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-
-  const getCookie = (name) => {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
-      }
-    }
-    return cookieValue;
-  }
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,32 +35,15 @@ export function LoginForm({
 
     setLoading(true);
     try {
-      // const csrftoken = getCookie('csrftoken');
-      const params: Record<string, string> = { username: username.trim(), password };
-      console.log(params);
-      const res = await loginApi(params);
-      const data = res.data || res;
-      console.log("loginApi res:", data);
-      // Extract token and user info
-      const token = data.token || data.access_token;
-      const user = data.user || data;
-      const displayName = user?.username || user?.nickname || user?.name || username;
-
-      if (token) {
-        localStorage.setItem(TOKEN_KEY, token);
-      }
-      localStorage.setItem("backend_username", displayName);
-      localStorage.setItem("backend_rolename", user.role.name);
-      localStorage.setItem("backend_roleid", user.role.id);
-
+      // 登录成功后后端下发 sessionid（HttpOnly）与 csrftoken（可读）cookie，
+      // 前端只缓存用户信息，不保存任何 token。
+      await signIn(username.trim(), password);
       toast.success("登录成功");
       navigate("/server/dashboard", { replace: true });
     } catch (err) {
-      console.log(err);
       const msg = err instanceof Error ? err.message : "登录失败";
       setError(msg);
       toast.error(msg);
-
     } finally {
       setLoading(false);
     }

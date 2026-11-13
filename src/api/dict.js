@@ -1,13 +1,16 @@
-import { apiGet, apiPost } from './apiClient';
+import { apiDelete, apiGet, apiPost } from './apiClient';
+
+// 后端字典分两个挂载点：/dict/*（字典类型）与 /dictdata/*（字典项）。
+// 注意：类型与字典项的更新后端都用 POST，删除用 DELETE。
 
 // ============ 字典类型 ============
-export const getDictList = (params) => apiGet('/api/v1/dict/list', params);
-export const addDict = (params) => apiPost('/api/v1/dict/add', params);
-export const updateDict = (params) => apiPost('/api/v1/dict/update', params);
-export const deleteDict = (id) => apiPost(`/api/v1/dict/delete/${id}`);
+export const getDictList = (params) => apiGet('/api/dict/list', params);
+export const addDict = (params) => apiPost('/api/dict/add', params);
+export const updateDict = (params) => apiPost('/api/dict/update', params);
+export const deleteDict = (id) => apiDelete(`/api/dict/delete/${id}`);
 
 // ============ 字典数据 ============
-export const getDictDataList = (params) => apiGet('/api/v1/dict/data/list', params);
-export const addDictData = (params) => apiPost('/api/v1/dict/data/add', params);
-export const updateDictData = (params) => apiPost('/api/v1/dict/data/update', params);
-export const deleteDictData = (id) => apiPost(`/api/v1/dict/data/delete/${id}`);
+export const getDictDataList = (params) => apiGet('/api/dictdata/list', params);
+export const addDictData = (params) => apiPost('/api/dictdata/add', params);
+export const updateDictData = (params) => apiPost('/api/dictdata/update', params);
+export const deleteDictData = (id) => apiDelete(`/api/dictdata/delete/${id}`);

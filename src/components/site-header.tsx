@@ -9,7 +9,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import ModeToggle from "@/components/mode-toggle";
-import { TOKEN_KEY } from "@/api/apiClient";
+import { signOut } from "@/api/session";
 
 import { TipButton } from "@/components/tip-button";
 
@@ -20,11 +20,8 @@ export function SiteHeader() {
     const { toggleSidebar } = useSidebar()
 
     const handleLogout = () => {
-        localStorage.removeItem(TOKEN_KEY)
-        localStorage.removeItem("backend_username")
-        localStorage.removeItem("backend_roleid")
-        localStorage.removeItem("backend_rolename")
-        navigate("/server/login", { replace: true })
+        // 会话状态由 session module 拥有；后端无 logout 路由，服务端 session 随浏览器关闭/过期失效
+        signOut();
     }
 
     return (

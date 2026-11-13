@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from "@/components/ui/select";
 import { DataTable } from "@/components/data-table";
-import { getExhibitTree, getControlList, addControl, updateControl, deleteControl, sendControl, batchAddControl } from "@/api/exhibition";
+import { getExhibitTree, getControlList, addControl, updateControl, deleteControl, batchAddControl } from "@/api/exhibition";
 import { Field, FieldGroup, FieldLabel,FieldError } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";

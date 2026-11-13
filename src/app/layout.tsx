@@ -6,15 +6,15 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
 import { SiteHeader } from "@/components/site-header"
 import { AppSidebar } from '@/components/app-sidebar';
-
-import { TOKEN_KEY } from '@/api/apiClient';
+import { useSession } from '@/hooks/use-session';
 
 const BackendLayout = () => {
 
     const [open, setOpen] = useState(false);
+    // 会话的唯一判断入口；失效时 session module 会清空并跳转，这里只做兜底
+    const user = useSession();
 
-	const token = localStorage.getItem(TOKEN_KEY);
-	if (!token) return <Navigate to="/" replace />;
+    if (!user) return <Navigate to="/" replace />;
 	return (
         <SidebarProvider
             style={

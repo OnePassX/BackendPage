@@ -88,8 +88,12 @@
 | **transport** | 数据访问 module（评审候选 01） | 后端地址策略、`{code,data,msg}` 信封、错误分类与拒绝语义、列表分页形状、token 注入 | 任何业务 JSON 列的形状；画布节点语义 | ADR-0001 |
 | **flow canvas** | 节点图画布 module（评审候选 02） | 节点/连线的编辑、布局策略、拖入、选中、序列化**机制**、保存时序 | 某个具体 JSON 列的字段名；后端端点知识 | ADR-0001 |
 | **document adapter** | 域侧的文档适配层（放在页面旁，不在上面两个 module 内） | 「JSON 列 ↔ 节点图」的**字段映射**、读写端点、节点外观 | 传输策略、画布交互 | ADR-0001 |
-| **session module** | 身份与会话 module（候选 03，未开工） | token 生命周期、当前用户、登录/登出、变化通知 | 具体页面渲染 | 候选 03 |
+| **session module** | 身份与会话 module（`src/api/session.ts`，已实现） | 当前用户信息、登录、登出、会话失效处理 | 会话凭据本身（HttpOnly cookie 由浏览器管理）、后端 URL、页面渲染 | ADR-0003 |
 | **media module** | 上传 module（候选 04，未开工） | 上传协议、鉴权、进度、取消 | 具体上传 UI | 候选 04 |
+
+> 认证术语：本项目**不使用 token 认证**。会话凭据是 Django 下发的 HttpOnly `sessionid` cookie，
+> 前端不保存、不读取、也不该感知它；登录接口返回的 `token` 字段是 CSRF token，不是认证凭据。
+> 详见 ADR-0003。
 
 ### 其它架构术语
 

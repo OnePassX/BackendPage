@@ -3,7 +3,6 @@ import { apiDelete, apiGet, apiPost, apiPut } from './apiClient';
 // ============ 设备 ============
 export const getDeviceList = (params) => apiGet('/api/device/list', params);
 export const getDeviceTree = (params) => apiGet('/api/device/tree', params);
-export const getDeviceDetail = (id) => apiGet(`/api/device/edit/${id}`);
 export const addDevice = (params) => apiPost('/api/device/add', params);
 export const updateDevice = (params) => apiPut('/api/device/update', params);
 export const deleteDevice = (id) => apiDelete(`/api/device/delete/${id}`);
