@@ -57,7 +57,7 @@ interface LayoutInput {
     machines: Array<{ id: number; m_name: string; m_p: linkItem | null; m_summary: string; show: number; sort: number }>;
     exhibits: Array<{ id: number; e_name: string; e_m: linkItem | null; e_summary: string; e_ip: string; e_re: string; show: number; sort: number }>;
     devices: Array<{ id: number; num: string; name: string; dtype: object; ip: string; conpare: string; area: number; link:number; other:string; major:Boolean; sort: number }>;
-    contents: Array<{id: number; e_id: number; c_name: string;c_file_status: object;c_file_type: object;c_file_name: string;c_file_addr: string;c_open: number;c_status: number;c_default: number;c_startup: number;c_control: object;c_iframe: string;c_iframe_show: number;c_link: string;note: string;sort: number;}>;
+    contents: Array<{id: number; e_id: number; c_name: string;c_file_status: object;c_file_type: object;c_file_name: string;c_file_addr: string;c_open: string;c_status: number;c_default: number;c_startup: number;c_control: string;c_iframe: string;c_iframe_show: number;c_link: string;note: string;sort: number;}>;
     // selectedExhibitId: number | null;
 }
 

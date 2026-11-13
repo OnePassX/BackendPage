@@ -15,6 +15,8 @@
 | 18 | 死代码：`getControlList` 导入、`handleContentControlSave` | 第一批 | ✅ 已完成 | 2026-11-13 |
 | 2 | 节点上的快捷添加按钮是假按钮 | 第二批 | ✅ 已完成 | 2026-11-13 |
 | 6 | 文件上传未接线（`FileUpload` 零输出） | 第二批 | ✅ 已完成 | 2026-11-13 |
+| 9 | 内容弹窗缺联动与字段（对齐 `content.tsx`） | 第三批（部分） | ✅ 已完成 | 2026-11-13 |
+| 19 | 内容弹窗「文件地址」标签写错 | 第三批（部分） | ✅ 已完成 | 2026-11-13 |
 
 后续批次（1/2/3/6、7/9/10、8/13/14）在开工时追加到本文件。
 
@@ -304,6 +306,91 @@ const onClick = () => { window.alert(`Handle button has been clicked!`); };
 
 ---
 
+# 第三批（部分）：内容表单对齐 exhibition/content.tsx（2026-11-13）
+
+## 9 + 19. 内容弹窗的字段与规则按 `content.tsx` 重做
+
+- **状态**：✅ 已完成
+- **位置**：`src/app/main.tsx` 内容编辑/新增弹窗；`src/components/ExhibitionFlow/ExhibitionFlow.tsx` 的 `contents` 属性类型
+
+**现象**
+`main.tsx` 的内容弹窗与 `exhibition/content.tsx` 的内容弹窗是两套不同的表单：
+
+| 项 | `main.tsx`（改前） | `content.tsx`（基准） |
+|---|---|---|
+| 存储位置标签 | 写成「文件地址」，且没有联动 | 「存储位置」，切换时联动 `c_status` |
+| 文件类型 | 无联动 | 服务器存储时禁用「网页地址」 |
+| 上传区域 | 一直显示 | 仅「服务器存储 + 可上传类型」显示 |
+| 文件地址/文件名称 | 无（只有上传） | 非服务器存储时手填 |
+| 程序名 `c_open` | 无 | 「程序文件 + 服务器存储」时显示 |
+| 控制 JSON / 控制页面 | 无 | 「程序文件」时显示 |
+| 当前打开状态 / 开机启动 | 可编辑的 Switch | 只读 Select（由设备端回写） |
+| 控制地址显示 / 排序 | Switch + 排序 | Select + 排序 |
+| 备注 | 单行 Input | 多行 Textarea |
+| 保存按钮 | 始终可用 | 上传中禁用并显示「上传中…」 |
+
+**原因**
+两个页面各自维护了一份内容表单，`main.tsx` 这份是早期草稿，字段和联动规则都没跟上。
+
+**改动**
+
+1. **字段与顺序完全对齐 `content.tsx`**（共 14 项）：
+   `c_name` → `c_file_status`（存储位置，联动 `c_status`）→ `c_file_type`（文件类型）→
+   上传文件 → 文件地址 → 文件名称 → 程序名 `c_open` → 当前打开状态 `c_default`（只读）→
+   开机启动 `c_startup`（只读）→ 控制 JSON `c_control` → 控制页面 `c_iframe` →
+   Iframe 显示状态 `c_iframe_show` → 排序 `sort` → 展区备注 `note`。
+
+2. **联动规则**（在组件内集中成两个变量，避免条件散落）：
+
+```tsx
+const isServerStorage  = contentFormData.c_file_status === 1;
+const isUploadableType = [1, 2, 3, 4, 6].includes(contentFormData.c_file_type);
+```
+
+| 规则 | 实现 |
+|---|---|
+| 存储位置=服务器(1) → `c_status=1`；否则 `c_status=2` | `c_file_status` 的 `onValueChange` 内联动 |
+| 服务器存储时禁用「网页地址(5)」 | `SelectItem disabled={isServerStorage && item.value === '5'}` |
+| 上传区仅服务器存储 + 可上传类型可见 | `className={isServerStorage && isUploadableType ? '' : 'hidden'}` |
+| 文件地址 / 文件名称仅非服务器存储可见 | `className={isServerStorage ? 'hidden' : ''}` |
+| 程序名仅「程序文件 + 服务器存储」可见 | `className={c_file_type === 1 && isServerStorage ? '' : 'hidden'}` |
+| 控制 JSON / 控制页面仅「程序文件」可见 | `className={c_file_type === 1 ? '' : 'hidden'}` |
+| 编辑时不可改存储位置与文件类型 | `disabled={Boolean(contentEditing)}` |
+| 上传中禁用保存/取消 | 新增 `contentUploading`，接 `FileUpload` 的 `onUploadingChange` |
+
+3. **默认值对齐 `content.tsx` 的 `defaultForm`**：
+   `c_open: ""`、`c_control: ""`、`c_default: 2`、`c_startup: 2`、`c_iframe_show: 2`、`sort: 1`
+   （改前是 `c_open: 1`、`c_control: {}`、三个状态均为 1、`sort: 0`）。
+
+4. **类型对齐后端模型**：
+   - `ContentItem` / `ContentFormData` 的 `c_open` 由 `number` 改为 `string`（后端是 CharField）；
+   - `c_control` 由 `object` 改为 `string`（后端是 TextField，前端按 JSON 文本编辑）；
+   - `ContentFormData.e_id` 允许 `null`（新增时先为空）；
+   - 同步修正 `ExhibitionFlow.tsx` 的 `contents` 属性类型，否则 `ContentItem[]` 传不进去（TS2322）。
+
+5. **删除与基准不一致的字段**：`绑定控制 ID`（`c_link`）输入框。`c_link` 仍保留在表单数据里，
+   编辑时原值会随保存回传，不会丢。
+
+6. **移除不再使用的 `Switch` 导入**（状态类字段统一改为 Select）。
+
+**验证**
+- `tsc`：7 个错误（与改动前一致，均为既有问题）。
+- `npm run lint`：133 → 131 warnings，0 errors。
+- 手工（待你在浏览器确认）：
+  1. 新增内容 → 存储位置选「展项客户端存储」→ 上传区消失，出现「文件地址」「文件名称」；
+  2. 存储位置选回「中控服务器存储」→ 上传区出现，文件类型里的「网页地址」变灰；
+  3. 文件类型选「程序文件」→ 出现「控制JSON」「控制页面」；选「视频文件」→ 两者消失；
+  4. 文件类型选「程序文件」且服务器存储 → 出现「程序名（带后缀）」；
+  5. 编辑已有内容 → 存储位置/文件类型不可改，其余字段带出原值；
+  6. 上传过程中「保存」按钮变「上传中…」且不可点。
+
+**已知不一致（沿用「遗留」中的记录）**
+「存储位置」有 3 个选项，但后端 `C_InfoOpSerializer` 限制 `c_file_status` 为 1~2，
+选「其他(3)」保存会被后端拒绝。本次按 `content.tsx` 原样对齐，未擅自改动选项，
+待确认以后端还是前端为准。
+
+---
+
 # 第一批验证汇总
 
 | 项目 | 改动前 | 改动后 |
@@ -325,10 +412,9 @@ const onClick = () => { window.alert(`Handle button has been clicked!`); };
 
 | 编号 | 缺口 | 说明 |
 |---|---|---|
-| 19 | 内容弹窗「文件地址」标签写错 | 实为存储位置（`c_file_status`），留待与表单联动一起改 |
 | 20 | `major`（是否为主内容设备）不可编辑 | 当前是 disabled 文本输入 |
 | 1、3 | 设备命令 Drawer、右键菜单 | 第二批剩余项 |
-| 7、9、10 | 侧栏添加类型、内容表单联动、显示状态快捷切换 | 第三批 |
+| 7、10 | 侧栏添加类型、显示状态快捷切换 | 第三批剩余项 |
 | 8、13、14 | e_link 入口、搜索、字典接后端 | 单独评估 |
 
 **本轮新发现（需后端/产品确认，暂不处理）**

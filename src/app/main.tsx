@@ -28,7 +28,6 @@ import {
 import {
 	Select, SelectContent, SelectItem, SelectTrigger, SelectValue,SelectGroup
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
 	Drawer, DrawerPortal, DrawerOverlay, DrawerContent,
 	DrawerHeader, DrawerTitle, DrawerDescription,
@@ -125,11 +124,11 @@ interface ContentItem {
 	c_file_type: FileTypeItem;
 	c_file_name: string;
 	c_file_addr: string;
-	c_open: number;
+	c_open: string;
 	c_status: number;
 	c_default: number;
 	c_startup: number;
-	c_control: object;
+	c_control: string;
 	c_iframe: string;
 	c_iframe_show: number;
 	c_link: string;
@@ -169,17 +168,17 @@ interface DeviceItem {
 
 
 interface ContentFormData {
-	e_id: number; // 展项id
+	e_id: number | null; // 展项id
 	c_name: string;
 	c_file_status: number;
 	c_file_type: number;
 	c_file_name: string;
 	c_file_addr: string;
-	c_open: number;
+	c_open: string;
 	c_status: number;
 	c_default: number;
 	c_startup: number;
-	c_control: object;
+	c_control: string;
 	c_iframe: string;
 	c_iframe_show: number;
 	c_link: string;
@@ -219,7 +218,7 @@ const DeviceTypeItems = [
 ]
 
 const FileStatusItems = [
-	{label:'服务器存储',value:'1'},{label:'展项电脑存储',value:'2'},{label:'其他',value:'3'},
+	{label:'中控服务器存储',value:'1'},{label:'展项客户端存储',value:'2'},{label:'其他',value:'3'},
 ]
 
 const FileTypeItems = [
@@ -243,12 +242,15 @@ export default function ManagePage() {
 
 	const [contentDialogOpen, setContentDialogOpen] = useState(false);
 	const [contentEditing, setContentEditing] = useState<ContentItem | null>(null);
-	const [contentFormData, setContentFormData] = useState(
+	// 与 exhibition/content.tsx 的 defaultForm 保持一致
+	const [contentFormData, setContentFormData] = useState<ContentFormData>(
 		{
-			e_id: null,c_name: "",c_file_status: 1,c_file_type: 1,c_file_name: '',c_file_addr: '',
-			c_open: 1,c_status: 1,c_default: 1,c_startup: 1,c_control: {},c_iframe: '',c_iframe_show: 1,c_link: '',note: '',sort: 0,
+			e_id: null, c_name: "", c_file_status: 1, c_file_type: 1, c_file_name: "", c_file_addr: "",
+			c_open: "", c_status: 1, c_default: 2, c_startup: 2, c_control: "", c_iframe: "", c_iframe_show: 2, c_link: "", note: "", sort: 1,
 		}
 	);
+	// 内容文件上传中（上传期间禁用保存/取消）
+	const [contentUploading, setContentUploading] = useState(false);
 
 	// --- Pavilion dialog state ---
 	const [pavDialogOpen, setPavDialogOpen] = useState(false);
@@ -634,20 +636,33 @@ export default function ManagePage() {
 	const openContentAdd = (parentNode: FlowNodeData) => {
 		setContentEditing(null);
 		setContentFormData({
-			e_id: parentNode.id, c_name: "",c_file_status: 1,c_file_type: 1,c_file_name: '',c_file_addr: '',
-			c_open: 1,c_status: 1,c_default: 1,c_startup: 1,c_control: {},c_iframe: '',c_iframe_show: 1,c_link: '',note: '',sort: 0,
+			e_id: parentNode.id, c_name: "", c_file_status: 1, c_file_type: 1, c_file_name: "", c_file_addr: "",
+			c_open: "", c_status: 1, c_default: 2, c_startup: 2, c_control: "", c_iframe: "", c_iframe_show: 2, c_link: "", note: "", sort: 1,
 		});
 		setContentDialogOpen(true);
 	};
 	// --- 内容 编辑 dialog open ---
 	const openContentEdit = (node: FlowNodeData) => {
-		console.log(node)
 		const c = contents.find((x) => x.id === node.id);
 		if (!c) return;
 		setContentEditing(c);
 		setContentFormData({
-			e_id: c.e_id, c_name:c.c_name, c_file_status: c.c_file_status.id,c_file_type: c.c_file_type.id,c_file_name: c.c_file_name,c_file_addr: c.c_file_addr,
-			c_open: c.c_open,c_status: c.c_status,c_default: c.c_default,c_startup: c.c_startup,c_control: c.c_control,c_iframe: c.c_iframe,c_iframe_show: c.c_iframe_show,c_link: c.c_link,note: c.note,sort: c.sort,
+			e_id: c.e_id,
+			c_name: c.c_name,
+			c_file_status: c.c_file_status.id,
+			c_file_type: c.c_file_type.id,
+			c_file_name: c.c_file_name,
+			c_file_addr: c.c_file_addr,
+			c_open: c.c_open,
+			c_status: c.c_status,
+			c_default: c.c_default,
+			c_startup: c.c_startup,
+			c_control: c.c_control,
+			c_iframe: c.c_iframe,
+			c_iframe_show: c.c_iframe_show,
+			c_link: c.c_link,
+			note: c.note,
+			sort: c.sort,
 		});
 		setContentDialogOpen(true);
 	};
@@ -708,6 +723,14 @@ export default function ManagePage() {
 		else if (node.kind === "device") handleDevDelete(node);
 		else if (node.kind === "content") handleContentDelete(node);
 	}
+
+	// 内容表单联动规则（与 exhibition/content.tsx 保持一致）
+	// 1) 存储位置=1（中控服务器）才需要上传文件，且只有 程序/视频/图片/文档/其他 需要文件
+	// 2) 存储位置≠1 时手填文件地址与文件名
+	// 3) 程序名只在「程序文件 + 中控服务器存储」时出现
+	// 4) 控制 JSON / 控制页面只在「程序文件」时出现
+	const isServerStorage = contentFormData.c_file_status === 1;
+	const isUploadableType = [1, 2, 3, 4, 6].includes(contentFormData.c_file_type);
 
 	return (
 		<div className="flex flex-col gap-4 px-4 lg:px-6 h-full">
@@ -1056,26 +1079,33 @@ export default function ManagePage() {
 				</DialogContent>
 			</Dialog>
 
-			{/* --- 内容 编辑/新增 dialog --- */}
+			{/* --- 内容 编辑/新增 dialog（字段与联动规则对齐 exhibition/content.tsx） --- */}
 			<Dialog open={contentDialogOpen} onOpenChange={setContentDialogOpen}>
 				<DialogContent className="sm:max-w-200">
 					<DialogHeader>
 						<DialogTitle>{contentEditing ? "编辑内容" : "新增内容"}</DialogTitle>
+						<DialogDescription>
+							{contentEditing ? "修改内容信息" : "填写新内容的信息"}
+						</DialogDescription>
 					</DialogHeader>
 					<form className="w-full">
 						<FieldGroup>
 							<Field>
-								<FieldLabel htmlFor="name">名称</FieldLabel>
-								<Input id="name" value={contentFormData.c_name} onChange={(e) => setContentFormData({ ...contentFormData, c_name: e.target.value })} placeholder="内容名称" />
-							</Field>
-							<Field>
-								<FieldLabel htmlFor="note">介绍</FieldLabel>
-								<Input id="note" value={contentFormData.note} onChange={(e) => setContentFormData({ ...contentFormData, note: e.target.value })} placeholder="内容介绍" />
+								<FieldLabel htmlFor="c_name">名称</FieldLabel>
+								<Input id="c_name" type="text" value={contentFormData.c_name} placeholder="名称" required onChange={(e) => setContentFormData({ ...contentFormData, c_name: e.target.value })}/>
 							</Field>
 							<div className="grid grid-cols-2 gap-4">
 								<Field>
-									<FieldLabel htmlFor="c_file_status">文件地址</FieldLabel>
-									<Select items={FileStatusItems} defaultValue="1" value={String(contentFormData.c_file_status)} onValueChange={(e) => setContentFormData({ ...contentFormData, c_file_status: Number(e) })} disabled={contentEditing?true:false}>
+									<FieldLabel htmlFor="c_file_status">存储位置</FieldLabel>
+									<Select items={FileStatusItems} defaultValue="1" value={String(contentFormData.c_file_status)}
+										onValueChange={(e) => {
+											// 服务器存储 → 下发状态未下发(1)；本地/其他 → 无需下发(2)
+											Number(e) === 1
+												? setContentFormData({ ...contentFormData, c_status: 1, c_file_status: Number(e) })
+												: setContentFormData({ ...contentFormData, c_status: 2, c_file_status: Number(e) });
+										}}
+										disabled={Boolean(contentEditing)}
+									>
 										<SelectTrigger id="c_file_status"><SelectValue /></SelectTrigger>
 										<SelectContent>
 											<SelectGroup>
@@ -1090,11 +1120,81 @@ export default function ManagePage() {
 								</Field>
 								<Field>
 									<FieldLabel htmlFor="c_file_type">文件类型</FieldLabel>
-									<Select items={FileTypeItems} defaultValue="1" value={String(contentFormData.c_file_type)} onValueChange={(e) => setContentFormData({ ...contentFormData, c_file_type: Number(e) })} disabled={contentEditing?true:false}>
+									<Select items={FileTypeItems} defaultValue="1" value={String(contentFormData.c_file_type)} onValueChange={(e) => setContentFormData({ ...contentFormData, c_file_type: Number(e) })} disabled={Boolean(contentEditing)}>
 										<SelectTrigger id="c_file_type"><SelectValue /></SelectTrigger>
 										<SelectContent>
 											<SelectGroup>
 											{FileTypeItems.map((item) => (
+												// 服务器存储没有「网页地址」这种文件
+												<SelectItem key={item.value} value={item.value} disabled={isServerStorage && item.value === '5'}>
+													{item.label}
+												</SelectItem>
+											))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</Field>
+							</div>
+
+							<Field className={isServerStorage && isUploadableType ? '' : 'hidden'}>
+								<FieldLabel htmlFor="file">上传文件</FieldLabel>
+								<FileUpload
+									accept=".jpg,.png,.jpeg,.pdf,.mp4,.zip,.pptx"
+									maxSize={5 * 1024 * 1024 * 1024}
+									value={contentFormData.c_file_addr}
+									fileName={contentFormData.c_file_name}
+									onUploaded={({ name, url }) => setContentFormData((prev) => ({
+										...prev,
+										c_file_name: name,
+										c_file_addr: url,
+									}))}
+									onClear={() => setContentFormData((prev) => ({
+										...prev,
+										c_file_name: "",
+										c_file_addr: "",
+									}))}
+									onUploadingChange={setContentUploading}
+								/>
+							</Field>
+
+							<Field className={isServerStorage ? 'hidden' : ''}>
+								<FieldLabel htmlFor="c_file_addr">文件地址</FieldLabel>
+								<Input id="c_file_addr" value={contentFormData.c_file_addr} placeholder="请输入目标电脑详细文件地址，如： D:/软件/v1/demo.exe" onChange={(e) => setContentFormData({ ...contentFormData, c_file_addr: e.target.value })}/>
+							</Field>
+
+							<Field className={isServerStorage ? 'hidden' : ''}>
+								<FieldLabel htmlFor="c_file_name">文件名称</FieldLabel>
+								<Input id="c_file_name" value={contentFormData.c_file_name} placeholder="请输入详细文件名，带后缀，如： demo.exe，video.mp4" onChange={(e) => setContentFormData({ ...contentFormData, c_file_name: e.target.value })}/>
+							</Field>
+
+							<Field className={contentFormData.c_file_type === 1 && isServerStorage ? '' : 'hidden'}>
+								<FieldLabel htmlFor="c_open">程序名（带后缀）</FieldLabel>
+								<Input id="c_open" type="text" value={contentFormData.c_open} placeholder="请输入ZIP目录中exe名称，需要携带.exe，如:demo.exe" onChange={(e) => setContentFormData({ ...contentFormData, c_open: e.target.value })}/>
+							</Field>
+
+							<div className="grid grid-cols-2 gap-4">
+								<Field>
+									<FieldLabel htmlFor="c_default">当前打开状态</FieldLabel>
+									<Select items={StatusItems} defaultValue="1" value={String(contentFormData.c_default)} onValueChange={(e) => setContentFormData({ ...contentFormData, c_default: Number(e) })} disabled>
+										<SelectTrigger id="c_default"><SelectValue /></SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+											{StatusItems.map((item) => (
+												<SelectItem key={item.value} value={item.value}>
+													{item.label}
+												</SelectItem>
+											))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="c_startup">开机启动</FieldLabel>
+									<Select items={StatusItems} defaultValue="1" value={String(contentFormData.c_startup)} onValueChange={(e) => setContentFormData({ ...contentFormData, c_startup: Number(e) })} disabled>
+										<SelectTrigger id="c_startup"><SelectValue /></SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+											{StatusItems.map((item) => (
 												<SelectItem key={item.value} value={item.value}>
 													{item.label}
 												</SelectItem>
@@ -1105,60 +1205,47 @@ export default function ManagePage() {
 								</Field>
 							</div>
 
-							<FileUpload
-								accept=".jpg,.png,.jpeg,.pdf,.mp4,.zip,.pptx"
-								maxSize={5 * 1024 * 1024 * 1024}
-								value={contentFormData.c_file_addr}
-								fileName={contentFormData.c_file_name}
-								onUploaded={({ name, url }) => setContentFormData((prev) => ({
-									...prev,
-									c_file_name: name,
-									c_file_addr: url,
-								}))}
-								onClear={() => setContentFormData((prev) => ({
-									...prev,
-									c_file_name: "",
-									c_file_addr: "",
-								}))}
-							/>
+							<Field className={contentFormData.c_file_type === 1 ? '' : 'hidden'}>
+								<FieldLabel htmlFor="c_control">控制JSON</FieldLabel>
+								<Textarea className="max-h-30" id="c_control" value={contentFormData.c_control ?? ''} placeholder="JSON格式，可先不填写，内容添加完成后使用流程图方式创建" onChange={(e) => setContentFormData({ ...contentFormData, c_control: e.target.value })}/>
+							</Field>
+
+							<Field className={contentFormData.c_file_type === 1 ? '' : 'hidden'}>
+								<FieldLabel htmlFor="c_iframe">控制页面</FieldLabel>
+								<Input id="c_iframe" type="text" value={contentFormData.c_iframe} placeholder="可植入局域网下控制页面，进行iframe插入，可不填写" onChange={(e) => setContentFormData({ ...contentFormData, c_iframe: e.target.value })}/>
+							</Field>
 
 							<div className="grid grid-cols-2 gap-4">
-								<Field orientation="horizontal" className="flex items-center">
-									<Switch className="m-1" id="c_default" size="default" checked={contentFormData.c_default === 1} onCheckedChange={(checked) => setContentFormData({ ...contentFormData, c_default: checked ? 1 : 2 })}/>
-									<FieldLabel htmlFor="c_default">当前打开状态</FieldLabel>
+								<Field>
+									<FieldLabel htmlFor="c_iframe_show">Iframe显示状态</FieldLabel>
+									<Select items={StatusItems} defaultValue="1" value={String(contentFormData.c_iframe_show)} onValueChange={(e) => setContentFormData({ ...contentFormData, c_iframe_show: Number(e) })}>
+										<SelectTrigger id="c_iframe_show"><SelectValue /></SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+											{StatusItems.map((item) => (
+												<SelectItem key={item.value} value={item.value}>
+													{item.label}
+												</SelectItem>
+											))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
 								</Field>
-								<Field orientation="horizontal">
-									<Switch className="m-1" id="c_startup" size="default" checked={contentFormData.c_startup === 1} onCheckedChange={(checked) => setContentFormData({ ...contentFormData, c_startup: checked ? 1 : 2 })}/>
-									<FieldLabel htmlFor="c_startup" >默认启动状态</FieldLabel>
-								</Field>
-							</div>
-
-							<Field>
-								<FieldLabel htmlFor="c_link">绑定控制 ID</FieldLabel>
-								<Input id="c_link" value={contentFormData.c_link} onChange={(e) => setContentFormData({ ...contentFormData, c_link: e.target.value })} disabled/>
-							</Field>
-							
-							<Field>
-								<FieldLabel htmlFor="c_iframe">第三方控制地址</FieldLabel>
-								<Input id="c_iframe" value={contentFormData.c_iframe} onChange={(e) => setContentFormData({ ...contentFormData, c_iframe: e.target.value })} placeholder="可不填写，如需填写请填写网站路由" />
-							</Field>
-			
-							<div className="grid grid-cols-2 gap-4">
-								<Field orientation="horizontal">
-									<Switch className="m-1" id="c_iframe_show" size="default" checked={contentFormData.c_iframe_show === 1} onCheckedChange={(checked) => setContentFormData({ ...contentFormData, c_iframe_show: checked ? 1 : 2 })}/>
-									<FieldLabel htmlFor="c_iframe_show">控制地址是否显示</FieldLabel>
-								</Field>
-								<Field orientation="horizontal">
-									<FieldLabel htmlFor="sort" className="w-12 leading">排序 :</FieldLabel>
+								<Field>
+									<FieldLabel htmlFor="sort">排序</FieldLabel>
 									<Input id="sort" type="number" value={contentFormData.sort} placeholder="请输入排序" onChange={(e) => setContentFormData({ ...contentFormData, sort: Number(e.target.value) })}/>
 								</Field>
 							</div>
-							
+
+							<Field>
+								<FieldLabel htmlFor="note">展区备注</FieldLabel>
+								<Textarea id="note" value={contentFormData.note ?? ''} placeholder="请输入备注" onChange={(e) => setContentFormData({ ...contentFormData, note: e.target.value })}/>
+							</Field>
 						</FieldGroup>
 					</form>
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setContentDialogOpen(false)}>取消</Button>
-						<Button onClick={handleContentSave}>保存</Button>
+						<Button variant="outline" onClick={() => setContentDialogOpen(false)} disabled={contentUploading}>取消</Button>
+						<Button onClick={handleContentSave} disabled={contentUploading}>{contentUploading ? "上传中..." : "保存"}</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
