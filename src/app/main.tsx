@@ -49,12 +49,13 @@ import {
 import { DataTable } from "@/components/data-table";
 
 import ExhibitionFlow from "@/components/ExhibitionFlow/ExhibitionFlow";
+import ExhibitionLinkFlow from "@/components/ExhibitionLinkFlow/ExhibitionLinkFlow";
 import type { FlowNodeData } from "@/components/ExhibitionFlow/types";
 import {
 	getPavilionList, addPavilion, updatePavilion, deletePavilion,
 	getMachineList, addMachine, updateMachine, deleteMachine,updateMachineLink,
 	getExhibitList, addExhibit, updateExhibit, deleteExhibit,updateExhibitLink,
-	getContentList, addContent, updateContent, deleteContent,
+	getContentList, addContent, updateContent, deleteContent, updateContentDownload,
 } from "@/api/exhibition";
 
 import { 
@@ -240,6 +241,10 @@ export default function ManagePage() {
 	const [selectedContent, setSelectedContent] = useState<FlowNodeData | null>(null);
 	const [contentControlDrawerOpen, setContentControlDrawerOpen] = useState(false);
 
+	// 展项快捷控制（e_link）Drawer
+	const [selectedExhibitControl, setSelectedExhibitControl] = useState<any>(null);
+	const [exhibitControlDrawerOpen, setExhibitControlDrawerOpen] = useState(false);
+
 	const [contentDialogOpen, setContentDialogOpen] = useState(false);
 	const [contentEditing, setContentEditing] = useState<ContentItem | null>(null);
 	// 与 exhibition/content.tsx 的 defaultForm 保持一致
@@ -362,6 +367,28 @@ export default function ManagePage() {
 			fetchTree();
 		}
 	}, []);
+	// --- 展项快捷控制（e_link）编辑 ---
+	const handleExhibitControlEdit = (node: FlowNodeData) => {
+		// ExhibitionLinkFlow 读取 { id, label, ip, link }；展项的 e_link 是磁盘上的 JSON 列
+		setSelectedExhibitControl({
+			id: node.id,
+			label: node.label,
+			ip: node.e_ip,
+			link: node.e_link,
+		});
+		setExhibitControlDrawerOpen(true);
+	};
+
+	// --- 内容 文件下发 ---
+	const handleContentDownload = async (node: FlowNodeData) => {
+		try {
+			await updateContentDownload({ id: node.id });
+			toast.success("指令已发送");
+		} catch (e: unknown) {
+			toast.error(e instanceof Error ? e.message : "发送失败");
+		}
+	};
+
 	// --- 设备命令 编辑 ---
 	const handleDeviceControlEdit = (node: FlowNodeData) =>{
 
@@ -751,6 +778,8 @@ export default function ManagePage() {
 					onDeleteLink={handleDeleteLink}
 					onContentControlEdit={handleContentControlEdit}
 					onDeviceControlEdit={handleDeviceControlEdit}
+					onExhibitControlEdit={handleExhibitControlEdit}
+					onContentDownload={handleContentDownload}
 				/>
 			</div>
 
@@ -782,6 +811,51 @@ export default function ManagePage() {
 							    这里只提供关闭 */}
 							<DrawerClose render={
 								<Button variant="outline" className="flex-1">关闭</Button> 
+							}>
+							</DrawerClose>
+						</DrawerFooter>
+					</DrawerContent>
+				</DrawerPortal>
+			</Drawer>
+
+			{/* 展项 快捷控制（e_link）Drawer —— 与 pme.tsx 的快捷命令管理一致 */}
+			<Drawer
+				disablePointerDismissal={true}
+				open={exhibitControlDrawerOpen}
+				onOpenChange={(open) => {
+					if (!open) {
+						setExhibitControlDrawerOpen(false);
+						setSelectedExhibitControl(null);
+						fetchTree();
+					}
+				}}
+				swipeDirection="right"
+			>
+				<DrawerPortal>
+					<DrawerOverlay />
+					<DrawerContent className="h-full w-full max-w-4/5">
+						<DrawerHeader>
+							<div className="flex items-center justify-start gap-2">
+								{selectedExhibitControl && (
+									<Badge variant="outline" className="text-xl h-8">
+										{selectedExhibitControl.label}
+									</Badge>
+								)}
+								<DrawerTitle>快捷命令管理</DrawerTitle>
+							</div>
+							<DrawerDescription>
+								管理展项快捷按钮控制
+							</DrawerDescription>
+						</DrawerHeader>
+
+						<div className="flex-1 overflow-y-auto px-4 py-4">
+							<ExhibitionLinkFlow controlData={selectedExhibitControl} />
+						</div>
+
+						<DrawerFooter className="flex flex-row">
+							{/* 保存动作由 ExhibitionLinkFlow 内部负责，这里只提供关闭 */}
+							<DrawerClose render={
+								<Button variant="outline" className="flex-1">关闭</Button>
 							}>
 							</DrawerClose>
 						</DrawerFooter>

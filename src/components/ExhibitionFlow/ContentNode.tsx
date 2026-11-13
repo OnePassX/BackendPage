@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Handle, Position, useConnection, type ConnectionState } from "@xyflow/react";
-import { ImageIcon, PencilIcon, Trash2Icon, MoreHorizontalIcon, Code, Plus } from "lucide-react";
+import { ImageIcon, PencilIcon, Trash2Icon, MoreHorizontalIcon, Code, Plus, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonHandle } from "@/components/xyflow/button-handle";
@@ -51,6 +51,10 @@ function ContentNode({ data, selected }) {
                         <DropdownMenuItem onClick={() => actions.onEdit(data)}>
                             <PencilIcon className="mr-2 size-4" />
                             编辑内容
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => actions.onContentDownload(data)}>
+                            <Send className="mr-2 size-4" />
+                            文件下发
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             className="text-destructive"

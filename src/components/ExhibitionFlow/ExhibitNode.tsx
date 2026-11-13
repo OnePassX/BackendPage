@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Handle, Position, useConnection, type ConnectionState } from "@xyflow/react";
-import { GalleryThumbnails, PencilIcon, Trash2Icon, MoreHorizontalIcon, Plus } from "lucide-react";
+import { GalleryThumbnails, PencilIcon, Trash2Icon, MoreHorizontalIcon, Plus, SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonHandle } from "@/components/xyflow/button-handle";
@@ -46,6 +46,10 @@ function ExhibitNode({ data, selected }) {
                         <DropdownMenuItem onClick={() => actions.onEdit(data)}>
                             <PencilIcon className="mr-2 size-4" />
                             编辑展项
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => actions.onExhibitControlEdit(data)}>
+                            <SlidersHorizontal className="mr-2 size-4" />
+                            编辑快捷控制
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             className="text-destructive"

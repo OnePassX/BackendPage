@@ -17,4 +17,8 @@ export interface FlowActions {
   onDelete: (node: FlowNodeData) => void;
   onContentControlEdit: (node: FlowNodeData) => void;
   onDeviceControlEdit: (node: FlowNodeData) => void;
+  /** 展项：编辑快捷控制（e_link） */
+  onExhibitControlEdit: (node: FlowNodeData) => void;
+  /** 内容：文件下发 */
+  onContentDownload: (node: FlowNodeData) => void;
 }

@@ -55,7 +55,7 @@ interface linkItem {
 interface LayoutInput {
     pavilions: Array<{ id: number; p_name: string; p_summary: string; p_re: string; show: number; sort: number }>;
     machines: Array<{ id: number; m_name: string; m_p: linkItem | null; m_summary: string; show: number; sort: number }>;
-    exhibits: Array<{ id: number; e_name: string; e_m: linkItem | null; e_summary: string; e_ip: string; e_re: string; show: number; sort: number }>;
+    exhibits: Array<{ id: number; e_name: string; e_m: linkItem | null; e_summary: string; e_ip: string; e_re: string; e_link: string; show: number; sort: number }>;
     devices: Array<{ id: number; num: string; name: string; dtype: object; ip: string; conpare: string; area: number; link:number; other:string; major:Boolean; sort: number }>;
     contents: Array<{id: number; e_id: number; c_name: string;c_file_status: object;c_file_type: object;c_file_name: string;c_file_addr: string;c_open: string;c_status: number;c_default: number;c_startup: number;c_control: string;c_iframe: string;c_iframe_show: number;c_link: string;note: string;sort: number;}>;
     // selectedExhibitId: number | null;
@@ -164,7 +164,7 @@ function buildFlow(input: LayoutInput): { nodes: Node<FlowNodeData>[]; edges: Ed
         id: `exhibit-${e.id}`,
         type: "exhibit",
         position: { x, y },
-        data: { id: e.id, label: e.e_name, kind: "exhibit", show: e.show, summary: e.e_summary, re: e.e_re, e_m: e.e_m?.id, e_ip: e.e_ip },
+        data: { id: e.id, label: e.e_name, kind: "exhibit", show: e.show, summary: e.e_summary, re: e.e_re, e_m: e.e_m?.id, e_ip: e.e_ip, e_link: e.e_link },
         // selected: selectedExhibitId === e.id,
     });
 
@@ -385,6 +385,10 @@ export interface ExhibitionFlowProps {
     onDeleteLink?: (source: FlowNodeData, target: FlowNodeData) => void;
     onContentControlEdit: (node: FlowNodeData) => void;
     onDeviceControlEdit: (node: FlowNodeData) => void;
+    /** 展项：打开快捷控制（e_link）编辑 */
+    onExhibitControlEdit: (node: FlowNodeData) => void;
+    /** 内容：下发文件到设备 */
+    onContentDownload: (node: FlowNodeData) => void;
 }
 
 // ── Inner component (needs ReactFlowProvider context) ──
@@ -405,6 +409,8 @@ function ExhibitionFlowInner({
     onDeleteLink,
     onContentControlEdit,
     onDeviceControlEdit,
+    onExhibitControlEdit,
+    onContentDownload,
 }: ExhibitionFlowProps) {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -417,8 +423,8 @@ function ExhibitionFlowInner({
 
     // Stable callbacks context
     const actions = useMemo<FlowActions>(
-        () => ({ onAddChild, onEdit, onDelete, onContentControlEdit,onDeviceControlEdit }),
-        [onAddChild, onEdit, onDelete, onContentControlEdit,onDeviceControlEdit],
+        () => ({ onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onContentDownload }),
+        [onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onContentDownload],
     );
 
     // Unlinked items (no parent): shown in the sidebar instead of the canvas.

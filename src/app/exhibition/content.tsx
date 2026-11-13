@@ -555,7 +555,7 @@ export default function ContentPage() {
                     <Button variant="ghost" size="sm" onClick={() => handleSend(row.original.id)} title="内容下发">
                         <SendIcon className="size-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDelete(row.original.id)} title="测试">
+                    <Button variant="ghost" size="sm" onClick={() => console.log(row.original.id)} title="测试">
                         <Code className="size-4" />
                     </Button>
                     <DeleteDialog view={<Trash2Icon className="size-4 text-destructive" />} label={'删除后不可恢复数据，请谨慎操作。'}  onDelete={()=>handleDelete(row.original.id)}/> 
@@ -685,7 +685,7 @@ export default function ContentPage() {
 					</DrawerContent>
 				</DrawerPortal>
 			</Drawer>
-            
+
             {/* --- 内容 编辑/新增 dialog --- */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogContent className="sm:max-w-200">

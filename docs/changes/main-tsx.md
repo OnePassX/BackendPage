@@ -17,6 +17,8 @@
 | 6 | 文件上传未接线（`FileUpload` 零输出） | 第二批 | ✅ 已完成 | 2026-11-13 |
 | 9 | 内容弹窗缺联动与字段（对齐 `content.tsx`） | 第三批（部分） | ✅ 已完成 | 2026-11-13 |
 | 19 | 内容弹窗「文件地址」标签写错 | 第三批（部分） | ✅ 已完成 | 2026-11-13 |
+| 21 | 展项节点缺「编辑快捷控制」入口（e_link） | 第四批 | ✅ 已完成 | 2026-11-13 |
+| 22 | 内容节点缺「文件下发」入口 | 第四批 | ✅ 已完成 | 2026-11-13 |
 
 后续批次（1/2/3/6、7/9/10、8/13/14）在开工时追加到本文件。
 
@@ -384,10 +386,96 @@ const isUploadableType = [1, 2, 3, 4, 6].includes(contentFormData.c_file_type);
   5. 编辑已有内容 → 存储位置/文件类型不可改，其余字段带出原值；
   6. 上传过程中「保存」按钮变「上传中…」且不可点。
 
-**已知不一致（沿用「遗留」中的记录）**
-「存储位置」有 3 个选项，但后端 `C_InfoOpSerializer` 限制 `c_file_status` 为 1~2，
-选「其他(3)」保存会被后端拒绝。本次按 `content.tsx` 原样对齐，未擅自改动选项，
-待确认以后端还是前端为准。
+**后端限制已解除（2026-11-13 确认）**
+「存储位置」的 3 个选项（1 中控服务器 / 2 展项客户端 / 3 其他）原本会被
+`C_InfoOpSerializer` 的 `max_value=2` 拒绝，该限制已由项目负责人在后端修改，
+前端无需再调整。注意：仓库内的 `../ServerControl_V4` 本地副本仍显示 `max_value=2`
+（mtime 2026-11-12），实际以部署机为准。
+
+---
+
+# 第四批：节点菜单新增入口（2026-11-13）
+
+## 21. 展项节点：编辑快捷控制（e_link）
+
+- **状态**：✅ 已完成
+- **位置**：`ExhibitNode.tsx` 下拉菜单、`ExhibitionFlow` 的 `FlowActions`、`main.tsx` 的 Drawer
+
+**现象**
+画布上的展项节点只有「编辑展项 / 删除展项」，没有编辑快捷控制流程（`e_link`）的入口。
+该能力只存在于 `pme.tsx` 的树表页面（`pme.tsx:465` 的「快捷命令管理」Drawer）。
+
+**原因**
+`ExhibitionFlow` 的节点动作集合里没有这一项：`FlowActions` 只有
+`onAddChild / onEdit / onDelete / onContentControlEdit / onDeviceControlEdit`。
+另外展项节点数据里没有携带 `e_link`，即使加了入口也读不到控制流程。
+
+**改动**
+
+1. `types.ts`：`FlowActions` 增加 `onExhibitControlEdit(node)`。
+2. `ExhibitionFlow.tsx`：
+   - props 增加 `onExhibitControlEdit`，并加入 `actions` 的 `useMemo`；
+   - `exhibits` 属性类型补 `e_link: string`；
+   - `makeExhibitNode` 的 `data` 补 `e_link`（后端 `E_InfoSerializer` 已返回该字段）。
+3. `ExhibitNode.tsx`：下拉菜单在「编辑展项」之后新增：
+
+```tsx
+<DropdownMenuItem onClick={() => actions.onExhibitControlEdit(data)}>
+    <SlidersHorizontal className="mr-2 size-4" />
+    编辑快捷控制
+</DropdownMenuItem>
+```
+
+4. `main.tsx`：
+   - 新增 `selectedExhibitControl` / `exhibitControlDrawerOpen` 状态；
+   - `handleExhibitControlEdit` 把节点映射成 `ExhibitionLinkFlow` 需要的
+     `{ id, label, ip, link }`（`ip ← e_ip`，`link ← e_link`）；
+   - 新增 Drawer（结构对齐 `pme.tsx:465-497`）：标题显示展项名 +「快捷命令管理」，
+     内容为 `<ExhibitionLinkFlow controlData={selectedExhibitControl} />`，
+     关闭时刷新画布数据（控制流程保存后节点/边需要重建）。
+
+**验证**
+- `tsc`：7 个错误（与改动前一致）。
+- 手工（待浏览器确认）：
+  1. 展项节点「⋮」→「编辑快捷控制」→ 右侧 Drawer 打开，标题是展项名；
+  2. 在 Drawer 里增删节点/连线并点「保存控制流程」→ 关闭后提示保存成功；
+  3. 重新打开，控制流程仍在（已写入 `e_link`）。
+
+## 22. 内容节点：文件下发
+
+- **状态**：✅ 已完成
+- **位置**：`ContentNode.tsx` 下拉菜单、`FlowActions`、`main.tsx`
+
+**现象**
+画布上的内容节点没有「文件下发」入口。同样的动作在 `content.tsx` 的列表里存在
+（`handleSend` → `updateContentDownload({ id })`）。
+
+**原因**
+`FlowActions` 没有对应动作，节点菜单只有编辑/删除/编辑软件控制命令三项。
+
+**改动**
+
+1. `types.ts`：`FlowActions` 增加 `onContentDownload(node)`。
+2. `ExhibitionFlow.tsx`：props 增加 `onContentDownload` 并加入 `actions`。
+3. `ContentNode.tsx`：下拉菜单在「编辑内容」之后新增：
+
+```tsx
+<DropdownMenuItem onClick={() => actions.onContentDownload(data)}>
+    <Send className="mr-2 size-4" />
+    文件下发
+</DropdownMenuItem>
+```
+
+4. `main.tsx`：`handleContentDownload` 调用 `updateContentDownload({ id })`
+   （与 `content.tsx` 的 `handleSend` 同一接口 `PUT /api/content/download`），
+   成功提示「指令已发送」，失败走统一错误提示。
+
+**验证**
+- `tsc`：7 个错误（与改动前一致）。
+- 手工（待浏览器确认）：
+  1. 内容节点「⋮」→「文件下发」→ 提示「指令已发送」；
+  2. 后端日志/设备端能收到下发指令；
+  3. 失败时（例如内容未上传文件）弹出后端返回的错误信息。
 
 ---
 
@@ -417,12 +505,10 @@ const isUploadableType = [1, 2, 3, 4, 6].includes(contentFormData.c_file_type);
 | 7、10 | 侧栏添加类型、显示状态快捷切换 | 第三批剩余项 |
 | 8、13、14 | e_link 入口、搜索、字典接后端 | 单独评估 |
 
-**本轮新发现（需后端/产品确认，暂不处理）**
+**已解决 / 待确认**
 
-- 内容存储位置 `c_file_status` 前端给了 3 个选项（服务器存储 / 展项电脑存储 / 其他 = 1/2/3），
-  但后端 `C_InfoOpSerializer` 限制 `max_value=2`，选「其他」保存会报
-  「文件状态值在1~2之间」。模型 `Content_Info.FILE_STATUS` 本身有第 3 项，
-  属于后端校验与模型不一致，需要确认以哪边为准。
+- ~~内容存储位置 `c_file_status` 后端限制 1~2~~：**已由项目负责人在后端修改**，
+  前端三个选项可直接使用（见第三批说明）。
 - 设备命令编辑（#1）在画布上仍是空入口：`handleDeviceControlEdit` 为空函数，
-  且 `main.tsx` 里只有一行「设备 命令管理 Drawer」注释占位。
+  且 `main.tsx` 里只有一行「设备 命令管理 Drawer」注释占位。待实现。
 
