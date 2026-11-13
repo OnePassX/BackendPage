@@ -802,6 +802,48 @@ if (!open) { setDrawerOpen(false); setSelectedXxx(null); fetchTree(); }
 
 ---
 
+## 24.1 内容编辑弹窗的「控制JSON」仍是旧数据（第九批补丁）
+
+- **状态**：✅ 已完成
+- **位置**：`src/app/main.tsx` `openContentEdit` / `handleContentControlSaved`
+
+**现象**
+在「软件控制命令」Drawer 里保存后关闭（已不再刷新画布），随后打开内容的
+「编辑内容」弹窗，里面的「控制JSON」字段显示的仍是保存前的旧 JSON。
+
+**影响**
+不只是显示问题：如果此时直接点保存，表单里的旧 `c_control` 会被提交，
+**把刚在流程图里保存的新流程覆盖掉**。
+
+**原因**
+`openContentEdit` 从 `contents` 数组取数据，而该数组只在 `fetchTree` 时更新；
+既然关闭 Drawer 不再刷新，`contents` 里仍是旧值。
+
+**改动**
+
+1. `openContentEdit`：优先取第九批引入的缓存 `contentControlJsonRef`，
+   取不到才回退到 `contents`：
+
+```tsx
+const freshControl = contentControlJsonRef.current.get(c.id);
+setContentFormData({ ..., c_control: freshControl ?? c.c_control, ... });
+```
+
+2. `handleContentControlSaved`：除了写缓存，若当前正在编辑的正是这条内容，
+   顺带把 `contentFormData.c_control` 同步为最新 JSON（防御性处理，
+   正常流程下弹窗与 Drawer 不会同时打开）。
+
+**验证**
+- `tsc`：6 个错误（与改动前一致）。
+- `npm run lint`：116 warnings（不变）。
+- 手工（待浏览器确认）：
+  1. 内容节点 →「编辑软件控制命令」→ 改流程 → 保存 → 关闭；
+  2. 内容节点 →「编辑内容」→「控制JSON」显示的是刚保存的内容；
+  3. 直接点保存 → 流程图里的内容不会被覆盖；
+  4. 打开控制 Drawer 也仍是最新流程。
+
+---
+
 # 第一批验证汇总
 
 | 项目 | 改动前 | 改动后 |

@@ -400,13 +400,18 @@ export default function ManagePage() {
 			setContentControlDrawerOpen(false);
 			setSelectedContent(null);
 			// 不刷新画布：控制流程不影响画布渲染，保存结果已通过 onSaved 缓存
+
 		}
 	}, []);
 	// --- 内容控制 保存成功 ---
 	const handleContentControlSaved = useCallback((json: string) => {
 		const id = editingContentIdRef.current;
-		if (id != null) contentControlJsonRef.current.set(id, json);
-	}, []);
+		if (id == null) return;
+		contentControlJsonRef.current.set(id, json);
+		// 若内容编辑弹窗当前正是这条内容，同步刷新表单里的「控制JSON」，
+		// 避免弹窗显示旧数据、保存时覆盖掉刚保存的流程
+		setContentFormData((prev) => (contentEditing?.id === id ? { ...prev, c_control: json } : prev));
+	}, [contentEditing]);
 
 	// --- 展项快捷控制（e_link）编辑 ---
 	const handleExhibitControlEdit = (node: FlowNodeData) => {
@@ -744,6 +749,9 @@ export default function ManagePage() {
 	const openContentEdit = (node: FlowNodeData) => {
 		const c = contents.find((x) => x.id === node.id);
 		if (!c) return;
+		// 若刚在「软件控制命令」Drawer 里保存过，优先用缓存里的最新 c_control：
+		// 否则弹窗会显示旧 JSON，直接保存还会把服务端的新流程覆盖掉
+		const freshControl = contentControlJsonRef.current.get(c.id);
 		setContentEditing(c);
 		setContentFormData({
 			e_id: c.e_id,
@@ -756,7 +764,7 @@ export default function ManagePage() {
 			c_status: c.c_status,
 			c_default: c.c_default,
 			c_startup: c.c_startup,
-			c_control: c.c_control,
+			c_control: freshControl ?? c.c_control,
 			c_iframe: c.c_iframe,
 			c_iframe_show: c.c_iframe_show,
 			c_link: c.c_link,
