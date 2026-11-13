@@ -24,6 +24,7 @@
 | 7 | 侧栏只能添加展厅 | 第七批 | ✅ 已完成 | 2026-11-13 |
 | 11 | 设备在线探测未接入 | 第七批 | ✅ 已完成 | 2026-11-13 |
 | 13 | 画布没有搜索/过滤 | 第七批 | ✅ 已完成 | 2026-11-13 |
+| 23 | 设备弹窗缺「设备探活」开关 | 第八批 | ✅ 已完成 | 2026-11-13 |
 
 后续批次（1/2/3/6、7/9/10、8/13/14）在开工时追加到本文件。
 
@@ -683,6 +684,56 @@ Drawer 与命令表格都没实现，`FlowActions.onDeviceControlEdit` 只连到
   2. 点「定位」→ 视口缩放到命中节点；
   3. 清空输入 → 全部恢复；
   4. 搜索状态下拖拽节点、连线仍然正常。
+
+---
+
+# 第八批：设备弹窗加入「设备探活」开关（2026-11-13）
+
+## 23. 设备编辑/新增缺少 probe_enabled 字段
+
+- **状态**：✅ 已完成
+- **位置**：`src/app/main.tsx` 设备编辑/新增弹窗
+
+**现象**
+画布的设备弹窗里没有「设备探活」开关，新建的设备一律使用后端默认值
+（`probe_enabled = False`），无法在画布上开启探活；而 `device/index.tsx`
+的设备弹窗里是有这个字段的。
+
+**原因**
+`main.tsx` 的 `devForm` 里没有 `probe_enabled`，弹窗也没有对应控件；
+`DeviceItem` 类型同样缺这个字段。
+
+**改动**（规则完全参照 `device/index.tsx`）
+
+1. `DeviceItem` 增加 `probe_enabled: boolean`。
+2. 新增常量：
+   - `ProbeItems`：`{ 不启用: 0, 启用探活: 1 }`（与 `device/index.tsx` 的 `PropeItems` 一致）；
+   - `PROBE_ENABLED_DTYPES = [3, 4]`：只有「电脑主机」「一体机」支持探活。
+3. `devForm` 默认值、`openDevAdd`、`openDevEdit` 均带上 `probe_enabled`。
+4. 弹窗把「设备厂家」与「设备探活」并排放进两列栅格，控件为 `Select`：
+
+```tsx
+<Select
+    items={ProbeItems}
+    value={devForm.probe_enabled ? "1" : "0"}
+    onValueChange={(e) => setDevForm({ ...devForm, probe_enabled: e === "1" })}
+    // 与 device/index.tsx 一致：只有电脑主机(3)/一体机(4) 支持探活
+    disabled={!PROBE_ENABLED_DTYPES.includes(devForm.dtype)}
+/>
+```
+
+标签右侧保留原文案提示：`*使用服务器30s一次设备活性探测`。
+
+后端已确认支持：`DeviceOpSerializer.fields` 包含 `probe_enabled`。
+
+**验证**
+- `tsc`：6 个错误（与改动前一致）。
+- `npm run lint`：116 warnings（不变）。
+- 手工（待浏览器确认）：
+  1. 新增设备 → 类型选「电脑主机」→ 「设备探活」可选，选「启用探活」保存；
+  2. 重新打开该设备 → 仍显示「启用探活」；
+  3. 类型改成「继电器」等非 3/4 → 探活下拉变灰不可选；
+  4. 保存后到「设备命令」Drawer 或设备列表页查看 `probe_enabled` 已写入。
 
 ---
 

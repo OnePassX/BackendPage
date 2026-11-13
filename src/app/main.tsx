@@ -165,6 +165,7 @@ interface DeviceItem {
 	link: number | undefined;
 	other: string;
 	major: boolean;
+	probe_enabled: boolean;
 	sort: number;
 }
 
@@ -222,10 +223,16 @@ const DeviceTypeItems = [
 const FileStatusItems = [
 	{label:'中控服务器存储',value:'1'},{label:'展项客户端存储',value:'2'},{label:'其他',value:'3'},
 ]
-
 const FileTypeItems = [
 	{label:'程序文件',value:'1'},{label:'视频文件',value:'2'},{label:'图片文件',value:'3'},{label:'文档文件',value:'4'},{label:'网页地址',value:'5'},{label:'其他',value:'6'},
 ]
+
+// 设备探活：与 device/index.tsx 的 PropeItems 一致（0 不启用 / 1 启用探活）
+const ProbeItems = [
+	{label:'不启用',value:'0'},{label:'启用探活',value:'1'},
+]
+// 只有「电脑主机(3)」「一体机(4)」支持探活，规则同 device/index.tsx
+const PROBE_ENABLED_DTYPES = [3, 4];
 
 
 // --- Page ---    
@@ -288,7 +295,7 @@ export default function ManagePage() {
 	// —— Device dialog state ——
 	const [devDialogOpen,setDevDialogOpen] = useState(false);
 	const [devEditing, setDevEditing] = useState<DeviceItem | null>(null);
-	const [devForm,setDevForm] = useState({ num: "无" , name:"", dtype: 1, ip:"", conpare:"", area:1, link:null, other: "", major: false, sort:0 })
+	const [devForm,setDevForm] = useState({ num: "无" , name:"", dtype: 1, ip:"", conpare:"", area:1, link:null, other: "", major: false, probe_enabled: false, sort:0 })
 
 	const [contentControlData, setContentControlData ] = useState<ContentControlItem[]>([]);
 	const [contentControlLoading, setContentControlLoading] = useState(true);
@@ -646,7 +653,7 @@ export default function ManagePage() {
 	const openDevAdd = (parentNode: FlowNodeData,area:number) => {
 		console.log(parentNode,area)
 		setDevEditing(null);
-		setDevForm({ num: "无" , name:"", dtype: 1, ip:"", conpare:"", area:area, link: parentNode.id, other: "", major: false, sort:0 });
+		setDevForm({ num: "无" , name:"", dtype: 1, ip:"", conpare:"", area:area, link: parentNode.id, other: "", major: false, probe_enabled: false, sort:0 });
 		setDevDialogOpen(true);
 	}
 	// --- 设备 编辑 dialog open ---
@@ -655,7 +662,7 @@ export default function ManagePage() {
 		const d = devices.find((x) => x.id === node.id);
 		if (!d) return;
 		setDevEditing(d);
-		setDevForm({ num: d.num , name:d.name, dtype: d.dtype.id, ip:d.ip, conpare:d.conpare, area:d.area, link: d.link, other: d.other, major: d.major, sort:d.sort });
+		setDevForm({ num: d.num , name:d.name, dtype: d.dtype.id, ip:d.ip, conpare:d.conpare, area:d.area, link: d.link, other: d.other, major: d.major, probe_enabled: d.probe_enabled, sort:d.sort });
 		setDevDialogOpen(true);
 	}
 	// --- 设备 更新/新增 方法 ---
@@ -1141,10 +1148,37 @@ export default function ManagePage() {
 								<FieldLabel htmlFor="ip">设备 IP</FieldLabel>
 								<Input id="ip" value={devForm.ip} onChange={(e) => setDevForm({ ...devForm, ip: e.target.value })} />
 							</Field>
-							<Field>
-								<FieldLabel htmlFor="conpare">设备厂家</FieldLabel>
-								<Input id="conpare" value={devForm.conpare} onChange={(e) => setDevForm({ ...devForm, conpare: e.target.value })} />
-							</Field>
+							<div className="grid grid-cols-2 gap-4">
+								<Field>
+									<FieldLabel htmlFor="conpare">设备厂家</FieldLabel>
+									<Input id="conpare" value={devForm.conpare} onChange={(e) => setDevForm({ ...devForm, conpare: e.target.value })} />
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="probe_enabled">
+										设备探活
+										<span className="text-destructive/50 text-xs">*使用服务器30s一次设备活性探测</span>
+									</FieldLabel>
+									<Select
+										items={ProbeItems}
+										defaultValue="0"
+										value={devForm.probe_enabled ? "1" : "0"}
+										onValueChange={(e) => setDevForm({ ...devForm, probe_enabled: e === "1" })}
+										// 与 device/index.tsx 一致：只有电脑主机(3)/一体机(4) 支持探活
+										disabled={!PROBE_ENABLED_DTYPES.includes(devForm.dtype)}
+									>
+										<SelectTrigger id="probe_enabled"><SelectValue /></SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+											{ProbeItems.map((item) => (
+												<SelectItem key={item.value} value={item.value}>
+													{item.label}
+												</SelectItem>
+											))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</Field>
+							</div>
 							<div className="grid grid-cols-2 gap-4">
 								<Field>
 									<FieldLabel htmlFor="area">所属位置</FieldLabel>
