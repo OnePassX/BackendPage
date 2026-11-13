@@ -55,8 +55,7 @@ import {
 	getPavilionList, addPavilion, updatePavilion, deletePavilion,
 	getMachineList, addMachine, updateMachine, deleteMachine,updateMachineLink,
 	getExhibitList, addExhibit, updateExhibit, deleteExhibit,updateExhibitLink,
-	getContentList, addContent, updateContent, deleteContent,updateContentControl,
-	getControlList,
+	getContentList, addContent, updateContent, deleteContent,
 } from "@/api/exhibition";
 
 import { 
@@ -347,9 +346,10 @@ export default function ManagePage() {
 
    	// --- 内容控制 编辑 ---
 	const handleContentControlEdit = (node: FlowNodeData) => {
-		console.log(node)
-		const e = exhibits.find((x) => x.id === node.eid);
-		setSelectedContent({...node, ip: e?.e_ip});
+		// 内容节点的父展项 id 存在 e_id（ExhibitionFlow 的 makeContentNode 写入），
+		// 不是 eid；取不到时退回节点自带的 ip，避免控制流程丢失设备地址
+		const e = exhibits.find((x) => x.id === Number(node.e_id));
+		setSelectedContent({ ...node, ip: e?.e_ip });
 		setContentControlDrawerOpen(true);
 	};
 	// --- 内容控制 drawer 状态改变 ---
@@ -360,17 +360,6 @@ export default function ManagePage() {
 			fetchTree();
 		}
 	}, []);
-	// --- 内容控制 编辑保存 ---
-	const handleContentControlSave = async (c_control) => {
-		try {
-			await updateContentControl({ id: selectedContent.id, c_control:c_control });
-			toast.success("内容控制成功");
-			// fetchTree();
-		} catch (e: unknown) {
-			toast.error(e instanceof Error ? e.message : "操作失败");
-		}
-	}
-
 	// --- 设备命令 编辑 ---
 	const handleDeviceControlEdit = (node: FlowNodeData) =>{
 
@@ -389,7 +378,7 @@ export default function ManagePage() {
 			if (source.kind === "pavilion" && target.kind === "machine") {
 				if(source.id !== target.m_p ){ 
 					await updateMachineLink({ id: target.id, m_p: source.id });
-					toast.success("展项已关联到展馆");
+					toast.success("展区已关联到展厅");
 					fetchTree();
 				}else{
 					toast.warning("不可重复连接！");
@@ -397,7 +386,7 @@ export default function ManagePage() {
 			} else if (source.kind === "machine" && target.kind === "exhibit") {
 				if(source.id !== target.e_m ){ 
 					await updateExhibitLink({ id: target.id, e_m: source.id });
-					toast.success("展品已关联到展项");
+					toast.success("展项已关联到展区");
 					fetchTree();
 				}else{
 					toast.warning("不可重复连接！");
@@ -431,27 +420,28 @@ export default function ManagePage() {
 	// --- 节点连接断开 ---
 	const handleDeleteLink = useCallback(async (source:FlowNodeData,target:FlowNodeData) => {
 		try{
-			console.log(source,target)
+			// 只有确实已关联时才需要断开；`target?.m_p || target.m_p !== null` 恒为真，
+			// 会把未关联的节点也发一次空更新
 			if (source.kind === "pavilion" && target.kind === "machine") {
-				if(target?.m_p || target.m_p !== null){
+				if (target.m_p != null) {
 					await updateMachineLink({ id: target.id, m_p: null });
 					toast.success("展区已取消关联");
 					fetchTree();
 				}
 			}else if (source.kind === "machine" && target.kind === "exhibit") {
-				if(target?.e_m || target.e_m !== null){
+				if (target.e_m != null) {
 					await updateExhibitLink({ id: target.id, e_m: null });
 					toast.success("展项已取消关联");
 					fetchTree();
 				}
 			}else if (source.kind === "pavilion" && target.kind === "device") {
-				if(target?.link || target.e_m !== null){
+				if (target.link != null) {
 					await updateDeviceLink({ id: target.id, area:2, link: null });
 					toast.success("设备已取消关联");
 					fetchTree();
 				}
 			}else if (source.kind === "exhibit" && target.kind === "device") {
-				if(target?.link || target.e_m !== null){
+				if (target.link != null) {
 					await updateDeviceLink({ id: target.id, area:1, link: null });
 					toast.success("设备已取消关联");
 					fetchTree();
@@ -765,7 +755,8 @@ export default function ManagePage() {
 						</div>
 
 						<DrawerFooter className="flex flex-row">
-							{/* <Button className="flex-1" onClick={handleContentControlSave}>提交</Button> */}
+							{/* 保存动作由 ContentControlFlow 内部的「保存控制流程」按钮负责，
+							    这里只提供关闭 */}
 							<DrawerClose render={
 								<Button variant="outline" className="flex-1">关闭</Button> 
 							}>
@@ -1118,11 +1109,11 @@ export default function ManagePage() {
 
 							<div className="grid grid-cols-2 gap-4">
 								<Field orientation="horizontal" className="flex items-center">
-									<Switch className="m-1" id="c_default" size="default" defaultChecked={contentFormData.c_default === 1?true:false}/>
+									<Switch className="m-1" id="c_default" size="default" checked={contentFormData.c_default === 1} onCheckedChange={(checked) => setContentFormData({ ...contentFormData, c_default: checked ? 1 : 2 })}/>
 									<FieldLabel htmlFor="c_default">当前打开状态</FieldLabel>
 								</Field>
 								<Field orientation="horizontal">
-									<Switch className="m-1" id="c_startup" size="default" defaultChecked={contentFormData.c_startup === 1?true:false}/>
+									<Switch className="m-1" id="c_startup" size="default" checked={contentFormData.c_startup === 1} onCheckedChange={(checked) => setContentFormData({ ...contentFormData, c_startup: checked ? 1 : 2 })}/>
 									<FieldLabel htmlFor="c_startup" >默认启动状态</FieldLabel>
 								</Field>
 							</div>
@@ -1139,12 +1130,12 @@ export default function ManagePage() {
 			
 							<div className="grid grid-cols-2 gap-4">
 								<Field orientation="horizontal">
-									<Switch className="m-1" id="c_iframe_show" size="default" defaultChecked={contentFormData.c_iframe_show === 1?true:false}/>
+									<Switch className="m-1" id="c_iframe_show" size="default" checked={contentFormData.c_iframe_show === 1} onCheckedChange={(checked) => setContentFormData({ ...contentFormData, c_iframe_show: checked ? 1 : 2 })}/>
 									<FieldLabel htmlFor="c_iframe_show">控制地址是否显示</FieldLabel>
 								</Field>
 								<Field orientation="horizontal">
 									<FieldLabel htmlFor="sort" className="w-12 leading">排序 :</FieldLabel>
-									<Input id="sort" type="number" value={devForm.sort} placeholder="请输入排序" onChange={(e) => setDevForm({ ...devForm, sort: Number(e.target.value) })}/>
+									<Input id="sort" type="number" value={contentFormData.sort} placeholder="请输入排序" onChange={(e) => setContentFormData({ ...contentFormData, sort: Number(e.target.value) })}/>
 								</Field>
 							</div>
 							
