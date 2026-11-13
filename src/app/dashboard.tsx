@@ -557,7 +557,7 @@ export default function Page() {
                             <FieldGroup>
                                 <Field>
                                     <FieldLabel htmlFor="msg">延期码</FieldLabel>
-                                    <Textarea className="min-h-40" id="active" onChange={(e) => setActiveData({ ...welcomeData, active: e.target.value })} />
+                                    <Textarea className="min-h-40" id="active" onChange={(e) => setActiveData({ active: e.target.value })} />
                                     <FieldDescription >请联系展厅中控供应商获取延期码</FieldDescription>
                                 </Field>
                             </FieldGroup>

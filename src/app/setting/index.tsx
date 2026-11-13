@@ -13,7 +13,7 @@ import { ImageCropper } from "@/components/image-cropper";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch"
 
-import { getEhData, saveEhData, getEhActive, getWelcome, saveWelcome } from "@/api/main.js";
+import { getEhData, saveEhData, getEhActive, getWelcome, saveWelcome, saveEhActive } from "@/api/main.js";
 
 interface EhdataItem {
     id: number;
@@ -49,7 +49,7 @@ export default function EhdataPage() {
     
     // 激活
     const [activeData,setActiveData] = useState<ActiveItem | null>(null);
-    const [activeForm,setActiveForm] = useState<any>(null);
+    const [activeForm,setActiveForm] = useState<any>({active:''});
     // 欢迎词
     const [welcomeData,setWelcomeData] = useState<WelcomeItem>(welcomeForm);
 
@@ -59,7 +59,7 @@ export default function EhdataPage() {
         try {
             const res = await getEhData();
             const raw = res.data;
-            console.log(raw);
+            // console.log(raw);
             setFormData(raw);
         } catch (e: unknown) { 
             toast.error(e instanceof Error ? e.message : "加载失败"); 
@@ -71,7 +71,7 @@ export default function EhdataPage() {
         try {
             const res = await getEhActive();
             const raw = res.data;
-            console.log(raw);
+            // console.log(raw);
             setActiveData(raw);
         } catch (e: unknown) { 
             toast.error(e instanceof Error ? e.message : "加载失败"); 
@@ -83,7 +83,7 @@ export default function EhdataPage() {
         try {
             const res = await getWelcome();
             const raw = res.data;
-            console.log(raw);
+            // console.log(raw);
             setWelcomeData(raw);
         } catch (e: unknown) { 
             toast.error(e instanceof Error ? e.message : "加载失败"); 
@@ -108,6 +108,16 @@ export default function EhdataPage() {
             toast.success("操作成功"); 
             fetchWelcomeData();
         } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "操作失败"); }
+    };
+
+    const hanldeActiveSave = async () => { 
+        try{
+            await saveEhActive(activeForm); 
+            toast.success("操作成功"); 
+            fetchData();
+        } catch (e: unknown) { 
+            toast.error(e instanceof Error ? e.message : "操作失败"); 
+        } 
     };
 
     return (
@@ -147,7 +157,7 @@ export default function EhdataPage() {
                                     <Field >
                                         <FieldLabel >展厅欢迎词是否启用</FieldLabel>
                                         <div className="flex items-center gap-2">
-                                            <Switch className="m-1" id="show" size="default" defaultChecked={welcomeData?.show ? true:false} onCheckedChange={(e) => setWelcomeData({...welcomeData, show: e})}/>
+                                            <Switch className="m-1" id="show" size="default" checked={welcomeData?.show ? true:false} onCheckedChange={(e) => setWelcomeData({...welcomeData, show: e})}/>
                                             {welcomeData?.show ? '启用':'禁用'}
                                         </div>
                                     </Field>
@@ -273,22 +283,16 @@ export default function EhdataPage() {
                         </div>
                         <form className="w-full">
                             <FieldGroup>
-                                <Field className="hidden">
-                                    <FieldLabel htmlFor="id">ID</FieldLabel>
-                                    <Input id="id" value={activeData?.id} />
-                                    <FieldDescription >ID</FieldDescription>
-                                </Field>
-
                                 <Field>
-                                    <FieldLabel htmlFor="msg">延期码:</FieldLabel>
-                                    <Textarea id="msg" value="" onChange={(e) => setActiveForm({ ...activeForm, msg: e.target.value })} />
+                                    <FieldLabel htmlFor="msg">延期码</FieldLabel>
+                                    <Textarea className="min-h-40" id="active" onChange={(e) => setActiveForm({ active: e.target.value })} />
                                     <FieldDescription >请联系展厅中控供应商获取延期码</FieldDescription>
                                 </Field>
                             </FieldGroup>
                         </form>
                     </CardContent>
                     <CardFooter>
-                        <Button type="submit" >提交</Button>
+                        <Button type="submit" onClick={hanldeActiveSave}>提交</Button>
                     </CardFooter>
                 </Card>
                 
