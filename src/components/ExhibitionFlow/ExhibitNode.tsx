@@ -25,10 +25,7 @@ function ExhibitNode({ data, selected }) {
 
     return (
         <div
-            className={`w-44 rounded-lg border bg-card shadow-sm transition-all ${selected
-                    ? "border-primary shadow-md ring-1 ring-primary/20"
-                    : "border-border hover:shadow-md"
-                }`}
+            className={`w-44 rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow ${ selected ? "ring-4 ring-black/40 dark:ring-white/80" : ""}`}
         >
             {/* Header */}
             <div className="flex items-center justify-between rounded-t-lg border-b border-border bg-blue-400 px-3 py-2 text-primary-foreground">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback,type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
 	PencilIcon, Trash2Icon, PlusIcon, FileIcon, PanelBottomOpen, PanelTopOpen
@@ -253,6 +253,19 @@ export default function ManagePage() {
 	const [selectedExhibitControl, setSelectedExhibitControl] = useState<any>(null);
 	const [exhibitControlDrawerOpen, setExhibitControlDrawerOpen] = useState(false);
 
+	/**
+	 * 控制流程保存后的最新 JSON 缓存。
+	 *
+	 * 控制流程（c_control / e_link）不在画布上渲染，保存后没必要整树 fetchTree——
+	 * 那会闪一次 loading 并让 ExhibitionFlow 重建节点、丢掉用户拖好的位置。
+	 * 这里按 id 记住刚保存的 JSON，再次打开 Drawer 时优先用它；
+	 * 任何一次真正的数据刷新（fetchTree）都会清空缓存，以服务端为准。
+	 */
+	const contentControlJsonRef = useRef<Map<number, string>>(new Map());
+	const exhibitLinkJsonRef = useRef<Map<number, string>>(new Map());
+	const editingContentIdRef = useRef<number | null>(null);
+	const editingExhibitIdRef = useRef<number | null>(null);
+
 	// 设备命令 Drawer
 	const [selectedDevice, setSelectedDevice] = useState<{ id: number; name: string; ip?: string } | null>(null);
 	const [deviceCommandDrawerOpen, setDeviceCommandDrawerOpen] = useState(false);
@@ -331,6 +344,9 @@ export default function ManagePage() {
 			setExhibits(exhibitData);
 			setDevices(deviceData);
 			setContents(contentData);
+			// 数据已从服务端刷新，之前缓存的「控制流程最新 JSON」不再需要
+			contentControlJsonRef.current.clear();
+			exhibitLinkJsonRef.current.clear();
 		} catch (e: unknown) {
 			toast.error(e instanceof Error ? e.message : "加载树结构失败");
 		} finally {
@@ -368,7 +384,14 @@ export default function ManagePage() {
 		// 内容节点的父展项 id 存在 e_id（ExhibitionFlow 的 makeContentNode 写入），
 		// 不是 eid；取不到时退回节点自带的 ip，避免控制流程丢失设备地址
 		const e = exhibits.find((x) => x.id === Number(node.e_id));
-		setSelectedContent({ ...node, ip: e?.e_ip });
+		// 优先用刚保存过的 JSON，避免读到画布上的旧节点数据
+		const fresh = contentControlJsonRef.current.get(node.id);
+		editingContentIdRef.current = node.id;
+		setSelectedContent({
+			...node,
+			c_control: fresh ?? node.c_control,
+			ip: e?.e_ip,
+		});
 		setContentControlDrawerOpen(true);
 	};
 	// --- 内容控制 drawer 状态改变 ---
@@ -376,20 +399,33 @@ export default function ManagePage() {
 		if (!open) {
 			setContentControlDrawerOpen(false);
 			setSelectedContent(null);
-			fetchTree();
+			// 不刷新画布：控制流程不影响画布渲染，保存结果已通过 onSaved 缓存
 		}
 	}, []);
+	// --- 内容控制 保存成功 ---
+	const handleContentControlSaved = useCallback((json: string) => {
+		const id = editingContentIdRef.current;
+		if (id != null) contentControlJsonRef.current.set(id, json);
+	}, []);
+
 	// --- 展项快捷控制（e_link）编辑 ---
 	const handleExhibitControlEdit = (node: FlowNodeData) => {
 		// ExhibitionLinkFlow 读取 { id, label, ip, link }；展项的 e_link 是磁盘上的 JSON 列
+		const fresh = exhibitLinkJsonRef.current.get(node.id);
+		editingExhibitIdRef.current = node.id;
 		setSelectedExhibitControl({
 			id: node.id,
 			label: node.label,
 			ip: node.e_ip,
-			link: node.e_link,
+			link: fresh ?? node.e_link,
 		});
 		setExhibitControlDrawerOpen(true);
 	};
+	// --- 展项快捷控制 保存成功 ---
+	const handleExhibitControlSaved = useCallback((json: string) => {
+		const id = editingExhibitIdRef.current;
+		if (id != null) exhibitLinkJsonRef.current.set(id, json);
+	}, []);
 
 	// --- 内容 文件下发 ---
 	const handleContentDownload = async (node: FlowNodeData) => {
@@ -841,7 +877,7 @@ export default function ManagePage() {
 						</DrawerHeader>
 
 						<div className="flex-1 overflow-y-auto px-4 py-4">
-							<CodeFlow controlData={selectedContent}/>
+							<CodeFlow controlData={selectedContent} onSaved={handleContentControlSaved}/>
 						</div>
 
 						<DrawerFooter className="flex flex-row">
@@ -864,7 +900,7 @@ export default function ManagePage() {
 					if (!open) {
 						setExhibitControlDrawerOpen(false);
 						setSelectedExhibitControl(null);
-						fetchTree();
+						// 不刷新画布：e_link 不影响画布渲染，保存结果已通过 onSaved 缓存
 					}
 				}}
 				swipeDirection="right"
@@ -887,7 +923,7 @@ export default function ManagePage() {
 						</DrawerHeader>
 
 						<div className="flex-1 overflow-y-auto px-4 py-4">
-							<ExhibitionLinkFlow controlData={selectedExhibitControl} />
+							<ExhibitionLinkFlow controlData={selectedExhibitControl} onSaved={handleExhibitControlSaved} />
 						</div>
 
 						<DrawerFooter className="flex flex-row">
@@ -910,7 +946,7 @@ export default function ManagePage() {
 
 			{/* --- 展厅 编辑/新增 Dialog --- */}
 			<Dialog open={pavDialogOpen} onOpenChange={setPavDialogOpen}>
-				<DialogContent className="sm:max-w-120">
+				<DialogContent className="sm:max-w-180">
 					<DialogHeader>
 						<DialogTitle>{pavEditing ? "编辑展馆" : "添加展馆"}</DialogTitle>
 					</DialogHeader>
@@ -966,7 +1002,7 @@ export default function ManagePage() {
 
 			{/* --- 展区 编辑/新增 Dialog --- */}
 			<Dialog open={macDialogOpen} onOpenChange={setMacDialogOpen}>
-				<DialogContent className="sm:max-w-120">
+				<DialogContent className="sm:max-w-180">
 					<DialogHeader>
 						<DialogTitle>{macEditing ? "编辑展区" : "添加展区"}</DialogTitle>
 					</DialogHeader>
@@ -1020,7 +1056,7 @@ export default function ManagePage() {
 
 			{/* --- 展项 编辑/新增 Dialog --- */}
 			<Dialog open={exhDialogOpen} onOpenChange={setExhDialogOpen}>
-				<DialogContent className="sm:max-w-120">
+				<DialogContent className="sm:max-w-180">
 					<DialogHeader>
 						<DialogTitle>{exhEditing ? "编辑展项" : "添加展项"}</DialogTitle>
 					</DialogHeader>
@@ -1113,7 +1149,7 @@ export default function ManagePage() {
 
 			{/* --- 设备 编辑/新增 Dialog --- */}
 			<Dialog open={devDialogOpen} onOpenChange={setDevDialogOpen}>
-				<DialogContent className="sm:max-w-120">
+				<DialogContent className="sm:max-w-180">
 					<DialogHeader>
 						<DialogTitle>{devEditing ? "编辑设备" : "添加设备"}</DialogTitle>
 					</DialogHeader>

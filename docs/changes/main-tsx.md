@@ -25,6 +25,7 @@
 | 11 | 设备在线探测未接入 | 第七批 | ✅ 已完成 | 2026-11-13 |
 | 13 | 画布没有搜索/过滤 | 第七批 | ✅ 已完成 | 2026-11-13 |
 | 23 | 设备弹窗缺「设备探活」开关 | 第八批 | ✅ 已完成 | 2026-11-13 |
+| 24 | 两个控制流程 Drawer 关闭时整树刷新，观感差 | 第九批 | ✅ 已完成 | 2026-11-13 |
 
 后续批次（1/2/3/6、7/9/10、8/13/14）在开工时追加到本文件。
 
@@ -734,6 +735,70 @@ Drawer 与命令表格都没实现，`FlowActions.onDeviceControlEdit` 只连到
   2. 重新打开该设备 → 仍显示「启用探活」；
   3. 类型改成「继电器」等非 3/4 → 探活下拉变灰不可选；
   4. 保存后到「设备命令」Drawer 或设备列表页查看 `probe_enabled` 已写入。
+
+---
+
+# 第九批：控制流程 Drawer 关闭时不再整树刷新（2026-11-13）
+
+## 24. 内容命令 Drawer / 展项快捷控制 Drawer 关闭后 fetchTree 的观感问题
+
+- **状态**：✅ 已完成
+- **位置**：`src/app/main.tsx`、`ContentControlFlow.tsx`、`ExhibitionLinkFlow.tsx`
+
+**现象**
+在「内容命令管理」或「展项快捷控制」Drawer 里编辑并保存，关闭 Drawer 时画布会
+闪一下 loading，随后节点全部跳回自动布局的位置（用户手动拖过的位置丢失）。
+
+**原因**
+两个 Drawer 的 `onOpenChange` 关闭分支都调用了 `fetchTree()`：
+
+```tsx
+if (!open) { setDrawerOpen(false); setSelectedXxx(null); fetchTree(); }
+```
+
+而 `fetchTree()` 会：
+
+1. `setTreeLoading(true)` → 画布先渲染 loading 态；
+2. 重新拉 5 个列表并替换 `pavilions/machines/exhibits/devices/contents`；
+3. 触发 `ExhibitionFlow` 的重建 effect（`setNodes(buildFlow(...))`），
+   所有节点按自动布局重新生成 → 手动位置被重置。
+
+但这两类保存改的是 `c_control` / `e_link`，**画布根本不渲染它们**，这次整树刷新完全是多余的。
+
+**为什么不能简单地"不刷新"**
+再次打开 Drawer 时，`selectedContent` / `selectedExhibitControl` 是从画布节点数据构造的，
+而节点数据仍是保存前的旧 JSON → 会看到旧流程，再次保存就会覆盖掉刚存的内容。
+
+**方案对比**
+
+| 方案 | 结论 |
+|---|---|
+| 打开时调详情接口取最新 JSON | ❌ 后端 `/content/edit/<id>`、`/exhibition/edit/<id>` 是手写 dict，**不返回** `c_control` / `e_link` |
+| 打开时拉列表再按 id 找 | ⚠️ 可行但每次打开多一次全量请求，且抽屉要等请求返回 |
+| **保存后回传最新 JSON 并缓存**（采用） | ✅ 零额外请求、无 loading、画布不动，且不会读到旧数据 |
+| 保留整树刷新但静默 + 重建时保留旧节点位置 | ⚠️ 更彻底（能一并解决其它 CRUD 的跳动），但涉及布局与新增节点的重叠风险，另行评估 |
+
+**改动**
+
+1. `ContentControlFlow.tsx`：新增可选属性 `onSaved?: (cControl: string) => void`，
+   在保存成功后把序列化后的 `c_control` 回传（`pme.tsx` 等其它调用方不传，行为不变）。
+2. `ExhibitionLinkFlow.tsx`：同样新增 `onSaved?: (eLink: string) => void`。
+3. `main.tsx`：
+   - 新增 `contentControlJsonRef` / `exhibitLinkJsonRef`（`Map<id, json>`）与
+     `editingContentIdRef` / `editingExhibitIdRef`；
+   - 两个 Drawer 的 `onSaved` 把最新 JSON 写入对应 Map；
+   - 打开 Drawer 时优先取 Map 里的 JSON，取不到才用节点数据；
+   - **关闭 Drawer 不再调用 `fetchTree()`**；
+   - `fetchTree()` 成功后清空两个 Map（真正的服务端刷新后以服务端为准）。
+
+**验证**
+- `tsc`：6 个错误（与改动前一致）。
+- `npm run lint`：116 warnings（不变）。
+- 手工（待浏览器确认）：
+  1. 打开「内容命令管理」→ 改流程 → 保存 → 关闭：**不再闪 loading、节点位置不动**；
+  2. 再次打开：看到的是刚保存的流程（不是旧数据）；
+  3. 展项「编辑快捷控制」同样；
+  4. 在画布上做一次新增/删除节点（会触发 `fetchTree`）后再打开 Drawer，仍是最新数据。
 
 ---
 

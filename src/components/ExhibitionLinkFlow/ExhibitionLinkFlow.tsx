@@ -277,7 +277,7 @@ const FlowCanvas = ({
 };
 
 // ---------- 主组件 ----------
-const Index = ({ controlData }: { controlData: ContentControlData | null }) => {
+const Index = ({ controlData, onSaved }: { controlData: ContentControlData | null; onSaved?: (eLink: string) => void }) => {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
     const [fitVersion, setFitVersion] = useState(0);
@@ -436,12 +436,14 @@ const Index = ({ controlData }: { controlData: ContentControlData | null }) => {
             const e_link = JSON.stringify(buildControlTree(nodes, edges));
             await updateExhibitControl({ id: contentId, e_link });
             toast.success('展项快捷控制保存成功');
+            // 把最新 JSON 回传给宿主，宿主可据此更新本地缓存，避免关闭后整树刷新
+            onSaved?.(e_link);
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : '保存失败');
         } finally {
             setSaving(false);
         }
-    }, [contentId, nodes, edges]);
+    }, [contentId, nodes, edges, onSaved]);
 
     return (
         <ReactFlowProvider>

@@ -18,12 +18,12 @@ const selector = (connection: ConnectionState) => {
 	return connection.inProgress;
 };
 
-const PavilionNode = ({ data }) => {
+const PavilionNode = ({ data, selected }) => {
 	// console.log(data)
 	const actions = useFlowActions();
 	const connectionInProgress = useConnection(selector);
 	return (
-		<div className="w-44 rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow">
+		<div className={`w-44 rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow ${ selected ? "ring-4 ring-black/40 dark:ring-white/80" : ""}`}>
 			{/* Header */}
 			<div className="flex items-center justify-between rounded-t-lg border-b border-border bg-blue-800/80 px-3 py-2 text-white">
 				<div className="flex items-center gap-2 min-w-0">
