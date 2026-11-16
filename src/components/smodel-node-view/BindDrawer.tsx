@@ -23,10 +23,17 @@ import {
     DrawerTitle,
 } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
-import { addSmodelBind, deleteSmodelBind, updateSmodelBind } from "@/api/model";
+import {
+    addHmodelBind,
+    addSmodelBind,
+    deleteHmodelBind,
+    deleteSmodelBind,
+    updateHmodelBind,
+    updateSmodelBind,
+} from "@/api/model";
 import { getContentList, getControlList } from "@/api/exhibition";
 import { getCodeList, getDeviceList } from "@/api/device";
-import type { SmodelBindRow } from "./types";
+import type { GraphBind, ModeVariant } from "./types";
 
 interface Option {
     value: number;
@@ -34,6 +41,7 @@ interface Option {
 }
 
 export interface BindDrawerProps {
+    variant: ModeVariant;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     mode: { id: number; name: string } | null;
@@ -41,7 +49,7 @@ export interface BindDrawerProps {
     /** null 表示「展厅级绑定」 */
     exhibit: { id: number; name: string } | null;
     /** 有值 = 编辑（仅延时），为空 = 新增 */
-    editing: SmodelBindRow | null;
+    editing: GraphBind | null;
     onChanged: () => void;
 }
 
@@ -59,13 +67,15 @@ function normalizeList(raw: unknown): any[] {
 }
 
 /**
- * 绑定编辑 Drawer。
+ * 绑定编辑 Drawer（软件模式 / 硬件模式共用）。
  *
- * 新增：类型 → 绑定对象 → 命令 → 延时（联动逻辑与 smodel.tsx 表格视图一致）
- * 编辑：后端 /smodelbind/update 只接受 { id, delay }，所以这里只能改延时；
- *       要改绑定对象请删除后重新新增。
+ * 新增：软件模式 = 类型 → 内容/设备 → 命令 → 延时；
+ *       硬件模式 = 设备 → 命令 → 延时（没有「类型」这一层）。
+ * 编辑：只改延时。软件模式后端只接受 {id, delay}；硬件模式虽然支持全量 update，
+ *       为保持两种模式一致，这里也统一只做延时。
  */
 export function BindDrawer({
+    variant,
     open,
     onOpenChange,
     mode,
@@ -74,6 +84,8 @@ export function BindDrawer({
     editing,
     onChanged,
 }: BindDrawerProps) {
+    const isSoftware = variant === "software";
+
     const [type, setType] = useState(1);
     const [bindId, setBindId] = useState<number | null>(null);
     const [codeId, setCodeId] = useState<number | null>(null);
@@ -101,25 +113,46 @@ export function BindDrawer({
     useEffect(() => {
         if (!open) return;
         if (editing) {
-            setType(editing.type);
-            setBindId(editing.bind?.id ?? null);
+            setType(editing.bindKind === "content" ? 1 : 2);
+            setBindId(editing.raw?.bind?.id ?? editing.raw?.device?.id ?? null);
             setCodeId(editing.code?.id ?? null);
             setDelay(editing.delay ?? 0);
-            setBindOptions(editing.bind ? [{ value: editing.bind.id, label: editing.bind.name }] : []);
+            setBindOptions([{ value: editing.raw?.bind?.id ?? editing.raw?.device?.id ?? 0, label: editing.bindName }]);
             setCodeOptions(editing.code ? [{ value: editing.code.id, label: editing.code.name }] : []);
         } else {
             reset();
         }
     }, [open, editing, reset]);
 
-    /** 按类型加载「绑定对象」候选 */
+    /** 加载「绑定对象」候选 */
     const loadBindOptions = useCallback(async (nextType: number) => {
         setBindOptions([]);
         setCodeOptions([]);
         setBindId(null);
         setCodeId(null);
+
+        const loadDevices = async (area: number, link?: number) => {
+            try {
+                const res = await getDeviceList({ area, link, page: 1, limit: 1000 });
+                setBindOptions(normalizeList(res.data).map((d) => ({ value: d.id, label: d.name })));
+            } catch {
+                setBindOptions([]);
+            }
+        };
+
+        if (!isSoftware) {
+            // 硬件模式：直接选设备
+            setLoadingBind(true);
+            try {
+                await loadDevices(exhibit ? 1 : 2, exhibit ? exhibit.id : pavilion?.id);
+            } finally {
+                setLoadingBind(false);
+            }
+            return;
+        }
+
+        // 软件模式
         if (!exhibit) {
-            // 展厅级：内容固定为「全局内容绑定」，命令取 e_id=0 的控制命令
             if (nextType === 1) {
                 setBindOptions([{ value: 0, label: "全局内容绑定" }]);
                 setBindId(0);
@@ -135,10 +168,7 @@ export function BindDrawer({
             } else {
                 setLoadingBind(true);
                 try {
-                    const res = await getDeviceList({ area: 2, link: pavilion?.id, page: 1, limit: 1000 });
-                    setBindOptions(normalizeList(res.data).map((d) => ({ value: d.id, label: d.name })));
-                } catch {
-                    setBindOptions([]);
+                    await loadDevices(2, pavilion?.id);
                 } finally {
                     setLoadingBind(false);
                 }
@@ -152,17 +182,13 @@ export function BindDrawer({
                 const res = await getContentList({ e_id: exhibit.id, page: 1, limit: 1000 });
                 setBindOptions(normalizeList(res.data).map((c) => ({ value: c.id, label: c.c_name })));
             } else {
-                const res = await getDeviceList({ area: 1, link: exhibit.id, page: 1, limit: 1000 });
-                setBindOptions(normalizeList(res.data).map((d) => ({ value: d.id, label: d.name })));
+                await loadDevices(1, exhibit.id);
             }
-        } catch {
-            setBindOptions([]);
         } finally {
             setLoadingBind(false);
         }
-    }, [exhibit, pavilion?.id]);
+    }, [isSoftware, exhibit, pavilion?.id]);
 
-    // 新增时，类型变化 / 打开时加载候选
     useEffect(() => {
         if (!open || isEdit) return;
         void loadBindOptions(type);
@@ -176,7 +202,7 @@ export function BindDrawer({
         setCodeOptions([]);
         setLoadingCode(true);
         try {
-            if (type === 1) {
+            if (isSoftware && type === 1) {
                 const res = await getControlList({ e_id: exhibit?.id ?? 0, page: 1, limit: 1000 });
                 setCodeOptions(normalizeList(res.data).map((c) => ({ value: c.id, label: c.name })));
             } else {
@@ -188,7 +214,7 @@ export function BindDrawer({
         } finally {
             setLoadingCode(false);
         }
-    }, [type, exhibit?.id]);
+    }, [isSoftware, type, exhibit?.id]);
 
     const handleSave = async () => {
         if (!mode || !pavilion) {
@@ -198,15 +224,26 @@ export function BindDrawer({
         setSaving(true);
         try {
             if (isEdit && editing) {
-                await updateSmodelBind({ id: editing.id, delay });
+                if (isSoftware) await updateSmodelBind({ id: editing.id, delay });
+                else await updateHmodelBind({ id: editing.id, delay });
                 toast.success("延时已更新");
-            } else {
+            } else if (isSoftware) {
                 await addSmodelBind({
                     model: mode.id,
                     pavilion: pavilion.id,
                     exhibition: exhibit?.id ?? null,
                     type,
                     bind: bindId ?? 0,
+                    code: codeId ?? 0,
+                    delay,
+                });
+                toast.success("绑定已新增");
+            } else {
+                await addHmodelBind({
+                    model: mode.id,
+                    pavilion: pavilion.id,
+                    exhibition: exhibit?.id ?? null,
+                    device: bindId ?? 0,
                     code: codeId ?? 0,
                     delay,
                 });
@@ -225,7 +262,8 @@ export function BindDrawer({
         if (!editing) return;
         setSaving(true);
         try {
-            await deleteSmodelBind(editing.id);
+            if (isSoftware) await deleteSmodelBind(editing.id);
+            else await deleteHmodelBind(editing.id);
             toast.success("已删除");
             onOpenChange(false);
             onChanged();
@@ -247,6 +285,7 @@ export function BindDrawer({
                         <div className="flex items-center gap-2">
                             <DrawerTitle>{title}</DrawerTitle>
                             {mode && <Badge variant="outline">{mode.name}</Badge>}
+                            <Badge variant="secondary">{isSoftware ? "软件模式" : "硬件模式"}</Badge>
                         </div>
                         <DrawerDescription>{scopeLabel}</DrawerDescription>
                     </DrawerHeader>
@@ -254,20 +293,22 @@ export function BindDrawer({
                     <div className="flex-1 space-y-4 overflow-y-auto px-4 py-2">
                         {isEdit ? (
                             <>
-                                <div className="space-y-1">
-                                    <Label>绑定类型</Label>
-                                    <div className="text-sm text-muted-foreground">
-                                        {editing?.type === 2 ? "绑定设备" : "绑定内容"}
+                                {isSoftware && (
+                                    <div className="space-y-1">
+                                        <Label>绑定类型</Label>
+                                        <div className="text-sm text-muted-foreground">
+                                            {editing?.bindKind === "device" ? "绑定设备" : "绑定内容"}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                                 <div className="space-y-1">
-                                    <Label>绑定对象</Label>
-                                    <div className="text-sm text-muted-foreground">{editing?.bind?.name || "-"}</div>
+                                    <Label>{isSoftware ? "绑定对象" : "绑定设备"}</Label>
+                                    <div className="text-sm text-muted-foreground">{editing?.bindName || "-"}</div>
                                 </div>
                                 <div className="space-y-1">
                                     <Label>命令</Label>
                                     <div className="text-sm text-muted-foreground">
-                                        {editing?.code ? `${editing.code.name} · ${editing.code.protocal}/${editing.code.port}` : "未配置"}
+                                        {editing?.code ? `${editing.code.name}${editing.code.protocal ? ` · ${editing.code.protocal}` : ""}` : "未配置"}
                                     </div>
                                 </div>
                                 <div className="space-y-1">
@@ -279,30 +320,32 @@ export function BindDrawer({
                                         onChange={(e) => setDelay(Number(e.target.value))}
                                     />
                                     <p className="text-xs text-muted-foreground">
-                                        后端仅支持修改延时；要更换绑定对象请删除后重新新增。
+                                        当前仅支持修改延时；要更换绑定对象请删除后重新新增。
                                     </p>
                                 </div>
                             </>
                         ) : (
                             <>
-                                <div className="space-y-1">
-                                    <Label>绑定类型</Label>
-                                    <Select
-                                        items={TYPE_ITEMS}
-                                        value={String(type)}
-                                        onValueChange={(v) => setType(Number(v))}
-                                    >
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            {TYPE_ITEMS.map((item) => (
-                                                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                {isSoftware && (
+                                    <div className="space-y-1">
+                                        <Label>绑定类型</Label>
+                                        <Select
+                                            items={TYPE_ITEMS}
+                                            value={String(type)}
+                                            onValueChange={(v) => setType(Number(v))}
+                                        >
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {TYPE_ITEMS.map((item) => (
+                                                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
 
                                 <div className="space-y-1">
-                                    <Label>绑定对象</Label>
+                                    <Label>{isSoftware ? "绑定对象" : "绑定设备"}</Label>
                                     <Select
                                         items={bindOptions.map((o) => ({ value: String(o.value), label: o.label }))}
                                         value={bindId == null ? undefined : String(bindId)}
@@ -320,7 +363,9 @@ export function BindDrawer({
                                     </Select>
                                     {!loadingBind && bindOptions.length === 0 && (
                                         <p className="text-xs text-muted-foreground">
-                                            {type === 2 ? "该范围下没有可绑定的设备" : "该展项下没有内容"}
+                                            {isSoftware
+                                                ? (type === 2 ? "该范围下没有可绑定的设备" : "该展项下没有内容")
+                                                : "该范围下没有可绑定的设备"}
                                         </p>
                                     )}
                                 </div>

@@ -26,7 +26,7 @@ import { getExhibitTree, getContentList, getControlList } from "@/api/exhibition
 import { getDeviceList, getCodeList} from "@/api/device";
 
 // import SmodelFlow from "@/components/SmodelFlow/SmodelFlow";
-import { SmodelNodeView } from "@/components/smodel-node-view";
+import { ModeNodeView } from "@/components/smodel-node-view";
 
 
 interface IconItem {
@@ -89,7 +89,7 @@ const TypeItems = [
 function NodeViewTab() {
     return (
         <div className="h-[calc(100dvh-220px)] w-full">
-            <SmodelNodeView />
+            <ModeNodeView variant="software" />
         </div>
     );
 }

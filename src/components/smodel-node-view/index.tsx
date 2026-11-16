@@ -24,21 +24,27 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { getSmodelList, getSmodelBindList } from "@/api/model";
+import {
+    getSmodelList,
+    getSmodelBindList,
+    getHmodelList,
+    getHmodelBindList,
+} from "@/api/model";
 import { getExhibitTree } from "@/api/exhibition";
 import SmodelNode from "./SmodelNode";
 import { BindDrawer } from "./BindDrawer";
-import type { SmodelBindRow, SmodelNodeData, TreePavilion } from "./types";
+import type { GraphBind, ModeVariant, SmodelNodeData, TreePavilion } from "./types";
 
 /**
- * 软件模式「节点视图」：模式 → 展厅 → 展区 → 展项 → 绑定。
+ * 模式「节点视图」：模式 → 展厅 → 展区 → 展项 → 绑定。
+ * 软件模式（smodel）与硬件模式（hmodel）共用，差异集中在数据接口与绑定结构。
  *
  * 数据：
- *   - 模式列表  GET /smodel/list
+ *   - 模式列表  GET /smodel/list | /hmodel/list
  *   - 展项树    GET /exhibition/tree
- *   - 绑定      GET /smodelbind/list
- *       优先 `?model_id&all=1`（后端支持后一次取全量）；
- *       后端尚未支持时回退为「按展厅 + 按展项」逐个取（N 次并行）。
+ *   - 绑定      GET /smodelbind/list | /hmodelbind/list
+ *       软件模式优先 `?model_id&all=1`（后端支持后一次取全量），否则回退逐个取；
+ *       硬件模式列表接口强制按 exhibition 过滤，只能逐个取。
  *
  * 交互：点击绑定节点编辑延时 / 删除；右键展项或展厅节点新增绑定；搜索定位。
  */
@@ -53,6 +59,17 @@ const NODE_SIZE: Record<SmodelNodeData["kind"], { w: number; h: number }> = {
 
 const nodeTypes = { smodel: SmodelNode };
 
+const MODE_API = {
+    software: {
+        listModes: getSmodelList,
+        listBinds: getSmodelBindList,
+    },
+    hardware: {
+        listModes: getHmodelList,
+        listBinds: getHmodelBindList,
+    },
+} as const;
+
 function normalizeList(raw: unknown): any[] {
     if (Array.isArray(raw)) return raw;
     if (raw && typeof raw === "object" && "items" in (raw as any)) {
@@ -61,31 +78,65 @@ function normalizeList(raw: unknown): any[] {
     return [];
 }
 
-/** 后端是否已支持 `all=1`（首次探测后记住，避免每次多打一次请求） */
-let allModeSupported: boolean | null = null;
+/** 把两种模式的绑定行归一化成 GraphBind */
+function normalizeBind(variant: ModeVariant, row: any): GraphBind {
+    if (variant === "hardware") {
+        return {
+            id: row.id,
+            bindKind: "hardware",
+            badge: "硬件",
+            bindName: row.device?.name ?? "-",
+            code: row.code ?? null,
+            delay: row.delay ?? 0,
+            raw: row,
+        };
+    }
+    const isDevice = row.type === 2;
+    return {
+        id: row.id,
+        bindKind: isDevice ? "device" : "content",
+        badge: isDevice ? "设备" : "内容",
+        bindName: row.bind?.name ?? "-",
+        code: row.code ?? null,
+        delay: row.delay ?? 0,
+        raw: row,
+    };
+}
 
-async function fetchBinds(modeId: number, tree: TreePavilion[]): Promise<SmodelBindRow[]> {
-    if (allModeSupported !== false) {
+/** 后端是否已支持 `all=1`；硬件模式列表接口目前一定不支持 */
+const allModeSupported: Record<ModeVariant, boolean | null> = {
+    software: null,
+    hardware: false,
+};
+
+async function fetchBinds(
+    variant: ModeVariant,
+    modeId: number,
+    tree: TreePavilion[],
+): Promise<GraphBind[]> {
+    const api = MODE_API[variant];
+
+    if (allModeSupported[variant] !== false) {
         try {
-            const res = await getSmodelBindList({ model_id: modeId, all: 1 });
-            allModeSupported = true;
-            return normalizeList(res.data) as SmodelBindRow[];
+            const res = await api.listBinds({ model_id: modeId, all: 1 });
+            allModeSupported[variant] = true;
+            return normalizeList(res.data).map((row) => normalizeBind(variant, row));
         } catch {
-            allModeSupported = false;
+            allModeSupported[variant] = false;
         }
     }
 
-    const fetchOne = async (params: Record<string, unknown>): Promise<SmodelBindRow[]> => {
+    const fetchOne = async (params: Record<string, unknown>): Promise<GraphBind[]> => {
         try {
-            const res = await getSmodelBindList(params);
-            return normalizeList(res.data) as SmodelBindRow[];
+            const res = await api.listBinds({ ...params, page: 1, limit: 1000 });
+            return normalizeList(res.data).map((row) => normalizeBind(variant, row));
         } catch {
-            // 该范围没有绑定时后端返回 code:-1，按空处理
+            // 该范围没有绑定时按空处理
             return [];
         }
     };
 
-    const tasks: Promise<SmodelBindRow[]>[] = [];
+    const tasks: Promise<GraphBind[]>[] = [];
     for (const p of tree) {
         // 展厅级（exhibition 为空）
         tasks.push(fetchOne({ model_id: modeId, pavilion_id: p.id }));
@@ -118,22 +169,23 @@ function layout(nodes: Node<SmodelNodeData>[], edges: Edge[]): Node<SmodelNodeDa
 function buildGraph(
     mode: { id: number; name: string; current?: number },
     tree: TreePavilion[],
-    binds: SmodelBindRow[],
+    binds: GraphBind[],
     showHidden: boolean,
 ): { nodes: Node<SmodelNodeData>[]; edges: Edge[] } {
     const nodes: Node<SmodelNodeData>[] = [];
     const edges: Edge[] = [];
 
-    const byExhibit = new Map<number, SmodelBindRow[]>();
-    const byPavilion = new Map<number, SmodelBindRow[]>();
+    const byExhibit = new Map<number, GraphBind[]>();
+    const byPavilion = new Map<number, GraphBind[]>();
     for (const b of binds) {
-        const exId = b.exhibition?.id ?? null;
+        const exId = b.raw?.exhibition?.id ?? null;
         if (exId != null) {
             if (!byExhibit.has(exId)) byExhibit.set(exId, []);
             byExhibit.get(exId)!.push(b);
-        } else if (b.pavilion && typeof b.pavilion === "object") {
-            if (!byPavilion.has(b.pavilion.id)) byPavilion.set(b.pavilion.id, []);
-            byPavilion.get(b.pavilion.id)!.push(b);
+        } else if (b.raw?.pavilion?.id != null) {
+            const pid = b.raw.pavilion.id;
+            if (!byPavilion.has(pid)) byPavilion.set(pid, []);
+            byPavilion.get(pid)!.push(b);
         }
     }
 
@@ -148,7 +200,7 @@ function buildGraph(
     });
 
     const pushBind = (
-        b: SmodelBindRow,
+        b: GraphBind,
         sourceId: string,
         pavilion: TreePavilion,
         exhibit: { id: number; name: string } | null,
@@ -161,7 +213,7 @@ function buildGraph(
             position: { x: 0, y: 0 },
             data: {
                 kind: "bind",
-                label: b.type === 2 ? "设备绑定" : "内容绑定",
+                label: b.bindKind === "content" ? "内容绑定" : b.bindKind === "device" ? "设备绑定" : "硬件绑定",
                 bind: b,
                 pavilionId: pavilion.id,
                 pavilionName: pavilion.name,
@@ -261,11 +313,13 @@ function buildGraph(
     return { nodes: layout(nodes, edges), edges };
 }
 
-function NodeViewInner() {
+function NodeViewInner({ variant }: { variant: ModeVariant }) {
+    const api = MODE_API[variant];
+
     const [modes, setModes] = useState<any[]>([]);
     const [modeId, setModeId] = useState<number | null>(null);
     const [tree, setTree] = useState<TreePavilion[]>([]);
-    const [binds, setBinds] = useState<SmodelBindRow[]>([]);
+    const [binds, setBinds] = useState<GraphBind[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [search, setSearch] = useState("");
@@ -278,7 +332,7 @@ function NodeViewInner() {
         open: boolean;
         pavilion: { id: number; name: string } | null;
         exhibit: { id: number; name: string } | null;
-        editing: SmodelBindRow | null;
+        editing: GraphBind | null;
     }>({ open: false, pavilion: null, exhibit: null, editing: null });
 
     const wrapRef = useRef<HTMLDivElement>(null);
@@ -293,7 +347,7 @@ function NodeViewInner() {
     useEffect(() => {
         (async () => {
             try {
-                const [mRes, tRes] = await Promise.all([getSmodelList({ page: 1, limit: 1000 }), getExhibitTree()]);
+                const [mRes, tRes] = await Promise.all([api.listModes({ page: 1, limit: 1000 }), getExhibitTree()]);
                 const list = normalizeList(mRes.data);
                 setModes(list);
                 const preferred = list.find((m) => m.current === 1) ?? list[0];
@@ -305,7 +359,7 @@ function NodeViewInner() {
                 setLoading(false);
             }
         })();
-    }, []);
+    }, [api]);
 
     const loadBinds = useCallback(async (id: number | null) => {
         if (id == null) {
@@ -314,14 +368,14 @@ function NodeViewInner() {
         }
         setLoading(true);
         try {
-            setBinds(await fetchBinds(id, tree));
+            setBinds(await fetchBinds(variant, id, tree));
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "加载绑定失败");
             setBinds([]);
         } finally {
             setLoading(false);
         }
-    }, [tree]);
+    }, [variant, tree]);
 
     useEffect(() => {
         if (modeId == null) return;
@@ -341,7 +395,7 @@ function NodeViewInner() {
         for (const n of graph.nodes) {
             const d = n.data;
             if (term) {
-                const hay = `${d.label} ${d.sub ?? ""} ${d.bind?.bind?.name ?? ""} ${d.bind?.code?.name ?? ""}`.toLowerCase();
+                const hay = `${d.label} ${d.sub ?? ""} ${d.bind?.bindName ?? ""} ${d.bind?.code?.name ?? ""}`.toLowerCase();
                 if (!hay.includes(term)) continue;
             }
             if (onlyUnbound && d.kind === "bind") continue;
@@ -422,7 +476,7 @@ function NodeViewInner() {
                     <Input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="搜索展项 / 内容 / 命令"
+                        placeholder="搜索展项 / 绑定对象 / 命令"
                         className="h-8 w-52 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
                     />
                     {search && (
@@ -528,27 +582,22 @@ function NodeViewInner() {
                                 <PlusIcon className="size-3.5" /> 新增绑定
                             </button>
                         )}
-                        {menu.node.kind === "bind" && (
-                            <>
-                                <button
-                                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
-                                    onClick={() => {
-                                        const d = menu.node;
-                                        setDrawer({
-                                            open: true,
-                                            pavilion: { id: d.pavilionId!, name: d.pavilionName ?? "" },
-                                            exhibit: d.exhibitId != null ? { id: d.exhibitId, name: d.exhibitName ?? "" } : null,
-                                            editing: d.bind ?? null,
-                                        });
-                                        setMenu(null);
-                                    }}
-                                >
-                                    编辑绑定
-                                </button>
-                            </>
-                        )}
-                        {menu.node.kind === "bind" && !menu.node.bind && (
-                            <div className="px-2 py-1.5 text-xs text-muted-foreground">无可用操作</div>
+                        {menu.node.kind === "bind" && menu.node.bind && (
+                            <button
+                                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+                                onClick={() => {
+                                    const d = menu.node;
+                                    setDrawer({
+                                        open: true,
+                                        pavilion: { id: d.pavilionId!, name: d.pavilionName ?? "" },
+                                        exhibit: d.exhibitId != null ? { id: d.exhibitId, name: d.exhibitName ?? "" } : null,
+                                        editing: d.bind ?? null,
+                                    });
+                                    setMenu(null);
+                                }}
+                            >
+                                编辑绑定
+                            </button>
                         )}
                     </div>
                 )}
@@ -563,6 +612,7 @@ function NodeViewInner() {
             </div>
 
             <BindDrawer
+                variant={variant}
                 open={drawer.open}
                 onOpenChange={(open) => setDrawer((prev) => ({ ...prev, open }))}
                 mode={currentMode ? { id: currentMode.id, name: currentMode.name } : null}
@@ -575,12 +625,17 @@ function NodeViewInner() {
     );
 }
 
-export function SmodelNodeView() {
+export function ModeNodeView({ variant }: { variant: ModeVariant }) {
     return (
         <ReactFlowProvider>
-            <NodeViewInner />
+            <NodeViewInner variant={variant} />
         </ReactFlowProvider>
     );
 }
 
-export default SmodelNodeView;
+/** 兼容旧引用：软件模式 */
+export function SmodelNodeView() {
+    return <ModeNodeView variant="software" />;
+}
+
+export default ModeNodeView;

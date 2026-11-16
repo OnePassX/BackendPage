@@ -27,6 +27,7 @@ import { getHmodelList, addHmodel, updateHmodel, deleteHmodel, updateHmodelStatu
 import { getExhibitTree } from "@/api/exhibition";
 import { getDeviceList, getCodeList} from "@/api/device";
 import { getIconList } from "@/api/icon";
+import { ModeNodeView } from "@/components/smodel-node-view";
 
 interface IconItem {
     id: number;
@@ -736,13 +737,9 @@ function TableViewTab() {
 
 // --- 节点视图 ---
 function NodeViewTab() {
-
-    const [modelData, setModelData] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    return(
-        <div className="w-full h-full flex">
-            {/* <SmodelFlow controlData={modelData}/> */}
+    return (
+        <div className="h-[calc(100dvh-220px)] w-full">
+            <ModeNodeView variant="hardware" />
         </div>
     );
 }

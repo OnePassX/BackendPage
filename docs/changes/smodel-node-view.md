@@ -125,7 +125,45 @@ def list(self, request):
 
 **验证**：`tsc` 6 个错误（不变）、`lint` 116 warnings（不变）。
 
-## 5. 已知遗留
+## 5. 2026-11-16 追加：硬件模式节点视图（复用同一组件）
+
+**需求**：参考软件模式节点视图，补齐「硬件模式管理」的节点视图。
+
+**做法**：不复制一份，而是把原组件泛化成 `ModeNodeView({ variant })`，
+软件模式（`smodel`）与硬件模式（`hmodel`）共用画布、布局、搜索、显隐与右键交互，
+差异集中在数据接口与绑定结构。
+
+| 维度 | 软件模式 | 硬件模式 |
+|---|---|---|
+| 模式列表 | `getSmodelList` | `getHmodelList` |
+| 绑定列表 | `getSmodelBindList` | `getHmodelBindList` |
+| 绑定结构 | `{ type: 1 内容 / 2 设备, bind, code, delay }` | `{ device, code, delay }`（无 type） |
+| 节点配色 | 内容=琥珀 / 设备=绿 | 硬件=靛蓝 |
+| Drawer 新增 | 类型 → 内容/设备 → 命令 → 延时 | 设备 → 命令 → 延时 |
+| 列表分页 | 接口不分页 | **接口分页**，逐项请求时统一带 `page=1&limit=1000` |
+| `all=1` | 会先探测，支持后一次取全量 | 后端强制按 `exhibition_id` 过滤且无 `all`，**始终走逐项回退** |
+
+**改动**：
+
+1. `types.ts`：新增 `ModeVariant`、`GraphBind`（把两种绑定归一化成
+   `{ bindKind, badge, bindName, code, delay, raw }`）。
+2. `index.tsx`：
+   - 导出 `ModeNodeView({ variant })`，保留 `SmodelNodeView` 作为软件模式别名；
+   - 用 `MODE_API` 表按 variant 选择接口；
+   - `normalizeBind()` 归一化两种绑定行；
+   - `allModeSupported` 按 variant 分别记忆（硬件恒为 `false`）。
+3. `BindDrawer.tsx`：新增 `variant` 属性，硬件模式隐藏「绑定类型」并直接选设备。
+4. `SmodelNode.tsx`：绑定节点按 `bindKind` 配色，徽标改用 `badge` 字段。
+5. `hmodel.tsx`：`NodeViewTab` 由空壳（含未使用的 `modelData`/`loading` 状态）改为
+   `<ModeNodeView variant="hardware" />`；`smodel.tsx` 同步改为
+   `<ModeNodeView variant="software" />`。
+
+**说明**：硬件模式的 `/hmodelbind/update` 实际支持全量更新（device/code 也能改），
+但为了与软件模式行为一致，Drawer 仍只允许改延时；如果以后要支持换绑定对象，改一处即可。
+
+**验证**：`tsc` 6 个错误（不变）、`lint` 116 → 112 warnings（hmodel 去掉两处未使用状态与导入）。
+
+## 6. 已知遗留
 
 - 后端 `all=1` 未加之前，首屏会按展项逐个请求（N 次并行）；展项很多时首次加载会慢一些。
 - `src/components/SmodelFlow/` 仍保留但已无引用（它是 ContentControlFlow 的克隆），

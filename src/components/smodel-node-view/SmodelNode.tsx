@@ -34,12 +34,14 @@ function SmodelNode({ data, selected }: NodeProps) {
     const style = KIND_STYLE[node.kind] ?? KIND_STYLE.bind;
     const Icon = style.icon;
 
-    // 绑定节点按类型换色：内容=琥珀，设备=绿色
+    // 绑定节点按类型换色：内容=琥珀，设备=绿色，硬件=靛蓝
     const bindHeader =
         node.kind === "bind"
-            ? node.bind?.type === 2
+            ? node.bind?.bindKind === "device"
                 ? "bg-emerald-600/85 text-white"
-                : "bg-amber-600/85 text-white"
+                : node.bind?.bindKind === "hardware"
+                    ? "bg-indigo-600/85 text-white"
+                    : "bg-amber-600/85 text-white"
             : style.header;
 
     const dimmed = node.unbound;
@@ -78,13 +80,13 @@ function SmodelNode({ data, selected }: NodeProps) {
                                 variant="outline"
                                 className="h-4 px-1 text-[9px]"
                             >
-                                {node.bind.type === 2 ? "设备" : "内容"}
+                                {node.bind.badge}
                             </Badge>
-                            <span className="truncate text-[11px]">{node.bind.bind?.name || "-"}</span>
+                            <span className="truncate text-[11px]">{node.bind.bindName || "-"}</span>
                         </div>
                         <div className="truncate text-[10px] text-muted-foreground">
                             {node.bind.code
-                                ? `${node.bind.code.name} · ${node.bind.code.protocal}/${node.bind.code.port}`
+                                ? `${node.bind.code.name}${node.bind.code.protocal ? ` · ${node.bind.code.protocal}` : ""}${node.bind.code.port != null ? `/${node.bind.code.port}` : ""}`
                                 : "未配置命令"}
                         </div>
                         {node.bind.delay > 0 && (
