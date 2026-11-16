@@ -180,16 +180,12 @@ function layout(nodes: Node<SmodelNodeData>[], _edges: Edge[]): Node<SmodelNodeD
     const deviceOf = (list: Node<SmodelNodeData>[]) =>
         list.filter((b) => b.data.bind?.bindKind !== "content");
 
-    // 网格：1 个时单列，≥2 时两列
-    const gridWidth = (count: number) => (count >= 2 ? 2 * BIND_W + H_GAP : count === 1 ? BIND_W : 0);
-    const gridColumns = (count: number, left: number, width: number) =>
-        count >= 2
-            ? [left + width / 2 - (BIND_W + H_GAP) / 2, left + width / 2 + (BIND_W + H_GAP) / 2]
-            : [left + width / 2];
+    // 每块固定单列：内容绑定一列、设备绑定一列，数量再多也不拆成两列
+    const blockWidth = (count: number) => (count > 0 ? BIND_W : 0);
 
     const bindBlockWidth = (list: Node<SmodelNodeData>[]) => {
-        const cw = gridWidth(contentOf(list).length);
-        const dw = gridWidth(deviceOf(list).length);
+        const cw = blockWidth(contentOf(list).length);
+        const dw = blockWidth(deviceOf(list).length);
         return cw + dw + (cw > 0 && dw > 0 ? H_GAP : 0);
     };
 
@@ -263,28 +259,20 @@ function layout(nodes: Node<SmodelNodeData>[], _edges: Edge[]): Node<SmodelNodeD
                 const eb = bindsOfExhibit(e.data.exhibitId!);
                 const content = contentOf(eb);
                 const device = deviceOf(eb);
-                const cw = gridWidth(content.length);
-                const dw = gridWidth(device.length);
+                const cw = blockWidth(content.length);
+                const dw = blockWidth(device.length);
                 if (cw > 0 || dw > 0) {
                     const total = cw + dw + (cw > 0 && dw > 0 ? H_GAP : 0);
                     const rowLeft = eCenterX - total / 2;
                     if (content.length > 0) {
-                        const cols = gridColumns(content.length, rowLeft, cw);
                         content.forEach((b, k) => {
-                            pos.set(b.id, {
-                                x: cols[k % 2] - BIND_W / 2,
-                                y: yBind + Math.floor(k / 2) * (BIND_H + V_GAP),
-                            });
+                            pos.set(b.id, { x: rowLeft, y: yBind + k * (BIND_H + V_GAP) });
                         });
                     }
                     if (device.length > 0) {
                         const devLeft = rowLeft + cw + (cw > 0 ? H_GAP : 0);
-                        const cols = gridColumns(device.length, devLeft, dw);
                         device.forEach((b, k) => {
-                            pos.set(b.id, {
-                                x: cols[k % 2] - BIND_W / 2,
-                                y: yBind + Math.floor(k / 2) * (BIND_H + V_GAP),
-                            });
+                            pos.set(b.id, { x: devLeft, y: yBind + k * (BIND_H + V_GAP) });
                         });
                     }
                 }
@@ -302,27 +290,19 @@ function layout(nodes: Node<SmodelNodeData>[], _edges: Edge[]): Node<SmodelNodeD
             const areaW = Math.max(0, w - offset);
             const content = contentOf(pb);
             const device = deviceOf(pb);
-            const cw = gridWidth(content.length);
-            const dw = gridWidth(device.length);
+            const cw = blockWidth(content.length);
+            const dw = blockWidth(device.length);
             const total = cw + dw + (cw > 0 && dw > 0 ? H_GAP : 0);
             const rowLeft = areaLeft + Math.max(0, (areaW - total) / 2);
             if (content.length > 0) {
-                const cols = gridColumns(content.length, rowLeft, cw);
                 content.forEach((b, k) => {
-                    pos.set(b.id, {
-                        x: cols[k % 2] - BIND_W / 2,
-                        y: yMachine + Math.floor(k / 2) * (BIND_H + V_GAP),
-                    });
+                    pos.set(b.id, { x: rowLeft, y: yMachine + k * (BIND_H + V_GAP) });
                 });
             }
             if (device.length > 0) {
                 const devLeft = rowLeft + cw + (cw > 0 ? H_GAP : 0);
-                const cols = gridColumns(device.length, devLeft, dw);
                 device.forEach((b, k) => {
-                    pos.set(b.id, {
-                        x: cols[k % 2] - BIND_W / 2,
-                        y: yMachine + Math.floor(k / 2) * (BIND_H + V_GAP),
-                    });
+                    pos.set(b.id, { x: devLeft, y: yMachine + k * (BIND_H + V_GAP) });
                 });
             }
         }
@@ -359,14 +339,29 @@ function buildGraph(
         }
     }
 
-    const edge = (source: string, target: string, danger = false): Edge => ({
+    // 流动的贝塞尔虚线：animated 让 dash 沿路径移动，颜色区分层级/绑定类型
+    const edge = (
+        source: string,
+        target: string,
+        kind: "tree" | "content" | "device" = "tree",
+        danger = false,
+    ): Edge => ({
         id: `e-${source}-${target}`,
         source,
         target,
-        type: "smoothstep",
-        style: danger
-            ? { stroke: "hsl(var(--destructive))", strokeDasharray: "4 4" }
-            : undefined,
+        type: "default",
+        animated: true,
+        style: {
+            stroke: danger
+                ? "hsl(var(--destructive))"
+                : kind === "content"
+                    ? "#f0b100"
+                    : kind === "device"
+                        ? "#1ACE0A"
+                        : "#3b82f6",
+            strokeWidth: 2,
+            strokeDasharray: "6 4",
+        },
     });
 
     const pushBind = (
@@ -393,7 +388,7 @@ function buildGraph(
                 hidden,
             },
         });
-        edges.push(edge(sourceId, id, !b.code));
+        edges.push(edge(sourceId, id, b.bindKind === "content" ? "content" : "device", !b.code));
     };
 
     const modeId = `mode-${mode.id}`;
