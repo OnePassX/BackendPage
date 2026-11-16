@@ -32,7 +32,7 @@ import {
 } from "@/api/model";
 import { getExhibitTree } from "@/api/exhibition";
 import SmodelNode from "./SmodelNode";
-import { BindDrawer } from "./BindDrawer";
+import { BindDialog } from "./BindDialog";
 import type { GraphBind, ModeVariant, SmodelNodeData, TreePavilion } from "./types";
 
 /**
@@ -106,7 +106,7 @@ function normalizeBind(variant: ModeVariant, row: any): GraphBind {
 /** 后端是否已支持 `all=1`；硬件模式列表接口目前一定不支持 */
 const allModeSupported: Record<ModeVariant, boolean | null> = {
     software: null,
-    hardware: false,
+    hardware: null,
 };
 
 async function fetchBinds(
@@ -611,7 +611,7 @@ function NodeViewInner({ variant }: { variant: ModeVariant }) {
                 )}
             </div>
 
-            <BindDrawer
+            <BindDialog
                 variant={variant}
                 open={drawer.open}
                 onOpenChange={(open) => setDrawer((prev) => ({ ...prev, open }))}

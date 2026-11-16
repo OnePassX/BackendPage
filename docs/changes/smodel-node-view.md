@@ -163,7 +163,24 @@ def list(self, request):
 
 **验证**：`tsc` 6 个错误（不变）、`lint` 116 → 112 warnings（hmodel 去掉两处未使用状态与导入）。
 
-## 6. 已知遗留
+## 6. 2026-11-16 追加：绑定新增/编辑改为 Dialog
+
+**需求**：软件模式与硬件模式绑定的「新增绑定 / 编辑绑定」由 Drawer 改为 Dialog。
+
+**改动**：
+
+1. 新增 `src/components/smodel-node-view/BindDialog.tsx`（由 `BindDrawer.tsx` 改写）：
+   - 外层 `Drawer` → `Dialog`（`sm:max-w-180`），标题行保留模式名与「软件模式/硬件模式」徽标；
+   - 表单改用 `FieldGroup` / `Field` / `FieldLabel`，与项目内其它弹窗一致；
+   - 底部 `DialogFooter`：编辑时多一个「删除」，其余为「取消 / 保存」。
+2. `index.tsx` 的引用由 `BindDrawer` 改为 `BindDialog`。
+3. 删除 `BindDrawer.tsx`（已无引用）。
+
+**说明**：表单字段、联动逻辑、保存与删除接口均未变化，只换了承载容器。
+
+**验证**：`tsc` 6 个错误（不变）、`lint` 112 warnings（不变）、`src` 下已无 `BindDrawer` 引用。
+
+## 7. 已知遗留
 
 - 后端 `all=1` 未加之前，首屏会按展项逐个请求（N 次并行）；展项很多时首次加载会慢一些。
 - `src/components/SmodelFlow/` 仍保留但已无引用（它是 ContentControlFlow 的克隆），

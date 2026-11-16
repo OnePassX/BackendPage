@@ -3,7 +3,14 @@ import { toast } from "sonner";
 import { Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     Select,
     SelectContent,
@@ -11,17 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import {
-    Drawer,
-    DrawerClose,
-    DrawerContent,
-    DrawerDescription,
-    DrawerFooter,
-    DrawerHeader,
-    DrawerOverlay,
-    DrawerPortal,
-    DrawerTitle,
-} from "@/components/ui/drawer";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import {
     addHmodelBind,
@@ -40,7 +37,7 @@ interface Option {
     label: string;
 }
 
-export interface BindDrawerProps {
+export interface BindDialogProps {
     variant: ModeVariant;
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -67,14 +64,14 @@ function normalizeList(raw: unknown): any[] {
 }
 
 /**
- * 绑定编辑 Drawer（软件模式 / 硬件模式共用）。
+ * 绑定编辑弹窗（软件模式 / 硬件模式共用）。
  *
  * 新增：软件模式 = 类型 → 内容/设备 → 命令 → 延时；
  *       硬件模式 = 设备 → 命令 → 延时（没有「类型」这一层）。
  * 编辑：只改延时。软件模式后端只接受 {id, delay}；硬件模式虽然支持全量 update，
  *       为保持两种模式一致，这里也统一只做延时。
  */
-export function BindDrawer({
+export function BindDialog({
     variant,
     open,
     onOpenChange,
@@ -83,7 +80,7 @@ export function BindDrawer({
     exhibit,
     editing,
     onChanged,
-}: BindDrawerProps) {
+}: BindDialogProps) {
     const isSoftware = variant === "software";
 
     const [type, setType] = useState(1);
@@ -277,42 +274,43 @@ export function BindDrawer({
     const title = useMemo(() => (isEdit ? "编辑绑定" : "新增绑定"), [isEdit]);
 
     return (
-        <Drawer disablePointerDismissal={true} open={open} onOpenChange={onOpenChange} swipeDirection="right">
-            <DrawerPortal>
-                <DrawerOverlay />
-                <DrawerContent className="h-full w-full max-w-md">
-                    <DrawerHeader>
-                        <div className="flex items-center gap-2">
-                            <DrawerTitle>{title}</DrawerTitle>
-                            {mode && <Badge variant="outline">{mode.name}</Badge>}
-                            <Badge variant="secondary">{isSoftware ? "软件模式" : "硬件模式"}</Badge>
-                        </div>
-                        <DrawerDescription>{scopeLabel}</DrawerDescription>
-                    </DrawerHeader>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-180">
+                <DialogHeader>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <DialogTitle>{title}</DialogTitle>
+                        {mode && <Badge variant="outline">{mode.name}</Badge>}
+                        <Badge variant="secondary">{isSoftware ? "软件模式" : "硬件模式"}</Badge>
+                    </div>
+                    <DialogDescription>{scopeLabel}</DialogDescription>
+                </DialogHeader>
 
-                    <div className="flex-1 space-y-4 overflow-y-auto px-4 py-2">
+                <form className="w-full">
+                    <FieldGroup>
                         {isEdit ? (
                             <>
                                 {isSoftware && (
-                                    <div className="space-y-1">
-                                        <Label>绑定类型</Label>
+                                    <Field>
+                                        <FieldLabel>绑定类型</FieldLabel>
                                         <div className="text-sm text-muted-foreground">
                                             {editing?.bindKind === "device" ? "绑定设备" : "绑定内容"}
                                         </div>
-                                    </div>
+                                    </Field>
                                 )}
-                                <div className="space-y-1">
-                                    <Label>{isSoftware ? "绑定对象" : "绑定设备"}</Label>
+                                <Field>
+                                    <FieldLabel>{isSoftware ? "绑定对象" : "绑定设备"}</FieldLabel>
                                     <div className="text-sm text-muted-foreground">{editing?.bindName || "-"}</div>
-                                </div>
-                                <div className="space-y-1">
-                                    <Label>命令</Label>
+                                </Field>
+                                <Field>
+                                    <FieldLabel>命令</FieldLabel>
                                     <div className="text-sm text-muted-foreground">
-                                        {editing?.code ? `${editing.code.name}${editing.code.protocal ? ` · ${editing.code.protocal}` : ""}` : "未配置"}
+                                        {editing?.code
+                                            ? `${editing.code.name}${editing.code.protocal ? ` · ${editing.code.protocal}` : ""}`
+                                            : "未配置"}
                                     </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="bind-delay">延时（毫秒）</Label>
+                                </Field>
+                                <Field>
+                                    <FieldLabel htmlFor="bind-delay">延时（毫秒）</FieldLabel>
                                     <Input
                                         id="bind-delay"
                                         type="number"
@@ -322,37 +320,37 @@ export function BindDrawer({
                                     <p className="text-xs text-muted-foreground">
                                         当前仅支持修改延时；要更换绑定对象请删除后重新新增。
                                     </p>
-                                </div>
+                                </Field>
                             </>
                         ) : (
                             <>
                                 {isSoftware && (
-                                    <div className="space-y-1">
-                                        <Label>绑定类型</Label>
+                                    <Field>
+                                        <FieldLabel htmlFor="bind-type">绑定类型</FieldLabel>
                                         <Select
                                             items={TYPE_ITEMS}
                                             value={String(type)}
                                             onValueChange={(v) => setType(Number(v))}
                                         >
-                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectTrigger id="bind-type"><SelectValue /></SelectTrigger>
                                             <SelectContent>
                                                 {TYPE_ITEMS.map((item) => (
                                                     <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                    </div>
+                                    </Field>
                                 )}
 
-                                <div className="space-y-1">
-                                    <Label>{isSoftware ? "绑定对象" : "绑定设备"}</Label>
+                                <Field>
+                                    <FieldLabel htmlFor="bind-target">{isSoftware ? "绑定对象" : "绑定设备"}</FieldLabel>
                                     <Select
                                         items={bindOptions.map((o) => ({ value: String(o.value), label: o.label }))}
                                         value={bindId == null ? undefined : String(bindId)}
                                         onValueChange={onBindChange}
                                         disabled={loadingBind || bindOptions.length === 0}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger id="bind-target">
                                             <SelectValue placeholder={loadingBind ? "加载中..." : "请选择绑定对象"} />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -368,17 +366,17 @@ export function BindDrawer({
                                                 : "该范围下没有可绑定的设备"}
                                         </p>
                                     )}
-                                </div>
+                                </Field>
 
-                                <div className="space-y-1">
-                                    <Label>命令</Label>
+                                <Field>
+                                    <FieldLabel htmlFor="bind-code">命令</FieldLabel>
                                     <Select
                                         items={codeOptions.map((o) => ({ value: String(o.value), label: o.label }))}
                                         value={codeId == null ? undefined : String(codeId)}
                                         onValueChange={(v) => setCodeId(Number(v))}
                                         disabled={loadingCode || codeOptions.length === 0 || bindId == null}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger id="bind-code">
                                             <SelectValue placeholder={loadingCode ? "加载中..." : "请选择命令"} />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -390,37 +388,34 @@ export function BindDrawer({
                                     {!loadingCode && bindId != null && codeOptions.length === 0 && (
                                         <p className="text-xs text-muted-foreground">该绑定对象下没有命令，可先不配置</p>
                                     )}
-                                </div>
+                                </Field>
 
-                                <div className="space-y-1">
-                                    <Label htmlFor="bind-delay-new">延时（毫秒）</Label>
+                                <Field>
+                                    <FieldLabel htmlFor="bind-delay-new">延时（毫秒）</FieldLabel>
                                     <Input
                                         id="bind-delay-new"
                                         type="number"
                                         value={delay}
                                         onChange={(e) => setDelay(Number(e.target.value))}
                                     />
-                                </div>
+                                </Field>
                             </>
                         )}
-                    </div>
+                    </FieldGroup>
+                </form>
 
-                    <DrawerFooter className="flex flex-row gap-2">
-                        {isEdit && (
-                            <Button variant="destructive" onClick={handleDelete} disabled={saving}>
-                                <Trash2Icon className="mr-1 size-4" /> 删除
-                            </Button>
-                        )}
-                        <DrawerClose render={
-                            <Button variant="outline" className="flex-1" disabled={saving}>取消</Button>
-                        }>
-                        </DrawerClose>
-                        <Button className="flex-1" onClick={handleSave} disabled={saving}>
-                            {saving ? "保存中..." : "保存"}
+                <DialogFooter>
+                    {isEdit && (
+                        <Button variant="destructive" onClick={handleDelete} disabled={saving}>
+                            <Trash2Icon className="mr-1 size-4" /> 删除
                         </Button>
-                    </DrawerFooter>
-                </DrawerContent>
-            </DrawerPortal>
-        </Drawer>
+                    )}
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>取消</Button>
+                    <Button onClick={handleSave} disabled={saving}>
+                        {saving ? "保存中..." : "保存"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
