@@ -52,15 +52,18 @@ function SmodelNode({ data, selected }: NodeProps) {
                 "rounded-lg border bg-card shadow-sm transition-shadow hover:shadow-md",
                 danger ? "border-destructive/60" : "border-border",
                 dimmed ? "border-dashed opacity-60" : "",
+                node.hidden ? "border-dashed opacity-60" : "",
                 selected ? "ring-4 ring-black/40 dark:ring-white/80" : "",
             ].join(" ")}
         >
             <div className={`flex items-center gap-2 rounded-t-lg px-3 py-1.5 ${bindHeader}`}>
                 <Icon className="size-3.5 shrink-0" />
                 <span className="truncate text-xs font-semibold">{node.label}</span>
-                {node.kind === "mode" && (
+                {node.kind === "mode" ? (
                     <Badge variant="secondary" className="ml-auto h-4 px-1 text-[9px]">模式</Badge>
-                )}
+                ) : node.hidden ? (
+                    <Badge variant="secondary" className="ml-auto h-4 px-1 text-[9px]">隐藏</Badge>
+                ) : null}
             </div>
 
             <div className="space-y-1 px-3 py-1.5">

@@ -13,7 +13,7 @@ import {
 import dagre from "@dagrejs/dagre";
 import "@xyflow/react/dist/style.css";
 import { toast } from "sonner";
-import { Loader2, PlusIcon, SearchIcon, XIcon } from "lucide-react";
+import { Loader2, PlusIcon, SearchIcon, XIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -119,6 +119,7 @@ function buildGraph(
     mode: { id: number; name: string; current?: number },
     tree: TreePavilion[],
     binds: SmodelBindRow[],
+    showHidden: boolean,
 ): { nodes: Node<SmodelNodeData>[]; edges: Edge[] } {
     const nodes: Node<SmodelNodeData>[] = [];
     const edges: Edge[] = [];
@@ -151,6 +152,7 @@ function buildGraph(
         sourceId: string,
         pavilion: TreePavilion,
         exhibit: { id: number; name: string } | null,
+        hidden: boolean,
     ) => {
         const id = `bind-${b.id}`;
         nodes.push({
@@ -166,6 +168,7 @@ function buildGraph(
                 exhibitId: exhibit?.id ?? null,
                 exhibitName: exhibit?.name ?? null,
                 missingCode: !b.code,
+                hidden,
             },
         });
         edges.push(edge(sourceId, id, !b.code));
@@ -184,6 +187,10 @@ function buildGraph(
     });
 
     for (const p of tree) {
+        // show !== 1 视为隐藏；默认不展示，打开「显示隐藏节点」后展示（置灰）
+        const pHidden = p.show !== undefined && p.show !== 1;
+        if (pHidden && !showHidden) continue;
+
         const pId = `pavilion-${p.id}`;
         const pavilionBinds = byPavilion.get(p.id) ?? [];
         nodes.push({
@@ -197,23 +204,36 @@ function buildGraph(
                 pavilionId: p.id,
                 pavilionName: p.name,
                 exhibitId: null,
+                hidden: pHidden,
             },
         });
         edges.push(edge(modeId, pId));
 
-        for (const b of pavilionBinds) pushBind(b, pId, p, null);
+        for (const b of pavilionBinds) pushBind(b, pId, p, null, pHidden);
 
         for (const m of p.children ?? []) {
+            const mHidden = pHidden || (m.show !== undefined && m.show !== 1);
+            if (mHidden && !showHidden) continue;
+
             const mId = `machine-${m.id}`;
             nodes.push({
                 id: mId,
                 type: "smodel",
                 position: { x: 0, y: 0 },
-                data: { kind: "machine", label: m.name, pavilionId: p.id, pavilionName: p.name },
+                data: {
+                    kind: "machine",
+                    label: m.name,
+                    pavilionId: p.id,
+                    pavilionName: p.name,
+                    hidden: mHidden,
+                },
             });
             edges.push(edge(pId, mId));
 
             for (const e of m.children ?? []) {
+                const eHidden = mHidden || (e.show !== undefined && e.show !== 1);
+                if (eHidden && !showHidden) continue;
+
                 const eId = `exhibit-${e.id}`;
                 const exhibitBinds = byExhibit.get(e.id) ?? [];
                 nodes.push({
@@ -229,10 +249,11 @@ function buildGraph(
                         pavilionName: p.name,
                         exhibitId: e.id,
                         exhibitName: e.name,
+                        hidden: eHidden,
                     },
                 });
                 edges.push(edge(mId, eId));
-                for (const b of exhibitBinds) pushBind(b, eId, p, e);
+                for (const b of exhibitBinds) pushBind(b, eId, p, e, eHidden);
             }
         }
     }
@@ -249,6 +270,8 @@ function NodeViewInner() {
 
     const [search, setSearch] = useState("");
     const [onlyUnbound, setOnlyUnbound] = useState(false);
+    /** 是否把 show !== 1 的展厅/展区/展项也画出来（默认隐藏） */
+    const [showHidden, setShowHidden] = useState(false);
 
     const [menu, setMenu] = useState<{ x: number; y: number; node: SmodelNodeData } | null>(null);
     const [drawer, setDrawer] = useState<{
@@ -306,8 +329,8 @@ function NodeViewInner() {
     }, [modeId, loadBinds]);
 
     const graph = useMemo(
-        () => (currentMode ? buildGraph(currentMode, tree, binds) : { nodes: [], edges: [] }),
-        [currentMode, tree, binds],
+        () => (currentMode ? buildGraph(currentMode, tree, binds, showHidden) : { nodes: [], edges: [] }),
+        [currentMode, tree, binds, showHidden],
     );
 
     // 搜索 / 只看未绑定：只改透明度，不增删节点
@@ -416,6 +439,17 @@ function NodeViewInner() {
                     onClick={() => setOnlyUnbound((v) => !v)}
                 >
                     只看未绑定
+                </Button>
+
+                <Button
+                    variant={showHidden ? "default" : "outline"}
+                    size="sm"
+                    className="h-8"
+                    title="展厅 / 展区 / 展项的 show 字段为隐藏时，默认不显示"
+                    onClick={() => setShowHidden((v) => !v)}
+                >
+                    {showHidden ? <EyeIcon className="mr-1 size-4" /> : <EyeOffIcon className="mr-1 size-4" />}
+                    显示隐藏节点
                 </Button>
 
                 <Badge variant="secondary" className="h-8 px-2">

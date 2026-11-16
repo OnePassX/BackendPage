@@ -10,17 +10,21 @@
 export interface TreeExhibit {
     id: number;
     name: string;
+    /** 1 显示 / 2 隐藏 */
+    show?: number;
 }
 
 export interface TreeMachine {
     id: number;
     name: string;
+    show?: number;
     children: TreeExhibit[];
 }
 
 export interface TreePavilion {
     id: number;
     name: string;
+    show?: number;
     children: TreeMachine[];
 }
 
@@ -69,4 +73,6 @@ export interface SmodelNodeData {
     unbound?: boolean;
     /** 绑定已存在但没配命令 */
     missingCode?: boolean;
+    /** 展厅/展区/展项的 show !== 1（含祖先被隐藏的情况） */
+    hidden?: boolean;
 }

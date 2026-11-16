@@ -98,7 +98,34 @@ def list(self, request):
 5. 右键展项 / 展厅 →「新增绑定」→ 选类型、对象、命令、延时 → 保存后图刷新；
 6. 搜索展项名 → 命中节点高亮、其余变淡；「只看未绑定」只留缺口。
 
-## 4. 已知遗留
+## 4. 2026-11-16 追加：按 `show` 字段显示/隐藏展项树节点
+
+**需求**：节点视图里展厅 / 展区 / 展项按各自的 `show` 字段决定是否显示，
+控制按钮放在搜索栏旁边。
+
+**数据**：`GET /exhibition/tree` 三层都返回 `show`（1 显示 / 2 隐藏）。
+
+**改动**：
+
+1. `types.ts`：`TreePavilion` / `TreeMachine` / `TreeExhibit` 补 `show?: number`；
+   `SmodelNodeData` 补 `hidden?: boolean`。
+2. `index.tsx`：
+   - 新增 `showHidden` 状态，默认 `false`；
+   - `buildGraph(..., showHidden)`：`show !== 1` 的节点默认**整棵子树跳过**
+     （父节点隐藏时子节点一并不显示）；打开开关后正常构建，但把节点标记为 `hidden`；
+   - 搜索栏旁新增「显示隐藏节点」按钮（`Eye` / `EyeOff` 图标，开启时高亮）。
+3. `SmodelNode.tsx`：`hidden` 节点显示为虚线边框 + 降透明度 + 头部「隐藏」徽标。
+
+**规则细节**：
+
+- `hidden` 取「自身 `show !== 1` **或** 任一祖先被隐藏」，所以父展厅隐藏时，
+  子展项即使 `show=1` 也会标为隐藏，避免出现"看起来可见实则不可见"的误导；
+- 隐藏节点下的绑定节点同样继承 `hidden`；
+- 「只看未绑定」与「显示隐藏节点」可叠加：默认只在对当前可见集合生效。
+
+**验证**：`tsc` 6 个错误（不变）、`lint` 116 warnings（不变）。
+
+## 5. 已知遗留
 
 - 后端 `all=1` 未加之前，首屏会按展项逐个请求（N 次并行）；展项很多时首次加载会慢一些。
 - `src/components/SmodelFlow/` 仍保留但已无引用（它是 ContentControlFlow 的克隆），
