@@ -10,7 +10,6 @@ import {
     type Edge,
     type Node,
 } from "@xyflow/react";
-import dagre from "@dagrejs/dagre";
 import "@xyflow/react/dist/style.css";
 import { toast } from "sonner";
 import { Loader2, PlusIcon, SearchIcon, XIcon, EyeIcon, EyeOffIcon } from "lucide-react";
@@ -49,14 +48,15 @@ import type { GraphBind, ModeVariant, SmodelNodeData, TreePavilion } from "./typ
  * 交互：点击绑定节点编辑延时 / 删除；右键展项或展厅节点新增绑定；搜索定位。
  */
 
-const NODE_SIZE: Record<SmodelNodeData["kind"], { w: number; h: number }> = {
-    mode: { w: 176, h: 64 },
-    pavilion: { w: 176, h: 60 },
-    machine: { w: 160, h: 52 },
-    exhibit: { w: 176, h: 76 },
-    // 绑定节点是紧凑胶囊：软件 2 行 / 硬件 1 行
-    bind: { w: 208, h: 56 },
-};
+// ── 布局常量（参考 ExhibitionFlow 的分层布局） ──
+const TREE_W = 176;
+const TREE_H = 96;
+const BIND_W = 176;
+const BIND_H = 104;
+const H_GAP = 24;
+const V_GAP = 80;
+const PAD = 24;
+const PAV_GAP = 60;
 
 const nodeTypes = { smodel: SmodelNode };
 
@@ -151,20 +151,188 @@ async function fetchBinds(
     return results.flat();
 }
 
-function layout(nodes: Node<SmodelNodeData>[], edges: Edge[]): Node<SmodelNodeData>[] {
-    const g = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-    // TB：层级自上而下，同级节点（尤其是同一展项下的多个绑定）会横向平铺而不是纵向堆叠
-    g.setGraph({ rankdir: "TB", nodesep: 28, ranksep: 90, marginx: 24, marginy: 24 });
-    nodes.forEach((n) => {
-        const size = NODE_SIZE[n.data.kind] ?? NODE_SIZE.bind;
-        g.setNode(n.id, { width: size.w, height: size.h });
-    });
-    edges.forEach((e) => g.setEdge(e.source, e.target));
-    dagre.layout(g);
+/**
+ * 自定义分层布局（参考 main.tsx 的 ExhibitionFlow）：
+ *
+ *   模式
+ *    └ 展厅
+ *        └ 展区
+ *            └ 展项
+ *                ├ 内容绑定（左列，≥2 个时两列网格）
+ *                └ 设备绑定（右列，≥2 个时两列网格）
+ *
+ * 内容绑定与设备绑定各占一块区域，横向并排、整体在展项下方居中；
+ * 展厅级绑定放在机器行右侧，避免和展区/展项重叠。
+ */
+function layout(nodes: Node<SmodelNodeData>[], _edges: Edge[]): Node<SmodelNodeData>[] {
+    const pos = new Map<string, { x: number; y: number }>();
+    const mode = nodes.find((n) => n.data.kind === "mode");
+    const pavilions = nodes.filter((n) => n.data.kind === "pavilion");
+    const machines = nodes.filter((n) => n.data.kind === "machine");
+    const exhibits = nodes.filter((n) => n.data.kind === "exhibit");
+    const binds = nodes.filter((n) => n.data.kind === "bind");
+
+    const bindsOfExhibit = (id: number) => binds.filter((b) => b.data.exhibitId === id);
+    const bindsOfPavilion = (id: number) =>
+        binds.filter((b) => b.data.exhibitId == null && b.data.pavilionId === id);
+    const contentOf = (list: Node<SmodelNodeData>[]) =>
+        list.filter((b) => b.data.bind?.bindKind === "content");
+    const deviceOf = (list: Node<SmodelNodeData>[]) =>
+        list.filter((b) => b.data.bind?.bindKind !== "content");
+
+    // 网格：1 个时单列，≥2 时两列
+    const gridWidth = (count: number) => (count >= 2 ? 2 * BIND_W + H_GAP : count === 1 ? BIND_W : 0);
+    const gridColumns = (count: number, left: number, width: number) =>
+        count >= 2
+            ? [left + width / 2 - (BIND_W + H_GAP) / 2, left + width / 2 + (BIND_W + H_GAP) / 2]
+            : [left + width / 2];
+
+    const bindBlockWidth = (list: Node<SmodelNodeData>[]) => {
+        const cw = gridWidth(contentOf(list).length);
+        const dw = gridWidth(deviceOf(list).length);
+        return cw + dw + (cw > 0 && dw > 0 ? H_GAP : 0);
+    };
+
+    const exhibitHalfWidth = (e: Node<SmodelNodeData>) =>
+        Math.max(TREE_W, bindBlockWidth(bindsOfExhibit(e.data.exhibitId!))) / 2;
+    const exhibitGap = (a: Node<SmodelNodeData>, b: Node<SmodelNodeData>) =>
+        exhibitHalfWidth(a) + exhibitHalfWidth(b) + H_GAP;
+    const exhibitRowWidth = (list: Node<SmodelNodeData>[]) => {
+        if (list.length === 0) return 0;
+        let w = TREE_W;
+        for (let i = 1; i < list.length; i++) w += exhibitGap(list[i - 1], list[i]);
+        return w;
+    };
+
+    const machinesOf = (pavilionId: number) => machines.filter((m) => m.data.pavilionId === pavilionId);
+    const exhibitsOf = (machineId: number) => exhibits.filter((e) => e.data.machineId === machineId);
+
+    const machineSlotWidth = (m: Node<SmodelNodeData>) => {
+        const list = exhibitsOf(m.data.machineId!);
+        if (list.length === 0) return TREE_W;
+        const rowW = exhibitRowWidth(list);
+        const first = exhibitHalfWidth(list[0]);
+        const last = exhibitHalfWidth(list[list.length - 1]);
+        return Math.max(TREE_W, rowW, rowW - TREE_W + 2 * Math.max(first, last));
+    };
+
+    const pavilionWidth = (p: Node<SmodelNodeData>) => {
+        const ms = machinesOf(p.data.pavilionId!);
+        const machineAreaW =
+            ms.reduce((s, m) => s + machineSlotWidth(m), 0) + Math.max(0, ms.length - 1) * H_GAP;
+        const pb = bindsOfPavilion(p.data.pavilionId!);
+        const pbW = bindBlockWidth(pb);
+        return Math.max(TREE_W, machineAreaW + (pb.length > 0 ? (machineAreaW > 0 ? H_GAP : 0) + pbW : 0));
+    };
+
+    // 各行 y
+    const yMode = 0;
+    const yPavilion = yMode + TREE_H + V_GAP;
+    const yMachine = yPavilion + TREE_H + V_GAP;
+    const yExhibit = yMachine + TREE_H + V_GAP;
+    const yBind = yExhibit + TREE_H + V_GAP;
+
+    const groups = pavilions.map((p) => ({ p, w: pavilionWidth(p) }));
+    const totalW = groups.reduce((s, g) => s + g.w, 0) + Math.max(0, groups.length - 1) * PAV_GAP;
+
+    if (mode) pos.set(mode.id, { x: PAD + totalW / 2 - TREE_W / 2, y: yMode });
+
+    let pavX = PAD;
+    for (const { p, w } of groups) {
+        const pavilionId = p.data.pavilionId!;
+        const ms = machinesOf(pavilionId);
+        const pb = bindsOfPavilion(pavilionId);
+        const machineAreaW =
+            ms.reduce((s, m) => s + machineSlotWidth(m), 0) + Math.max(0, ms.length - 1) * H_GAP;
+        const pavCenterX = machineAreaW > 0 ? pavX + machineAreaW / 2 : pavX + w / 2;
+        pos.set(p.id, { x: pavCenterX - TREE_W / 2, y: yPavilion });
+
+        let mx = pavX;
+        for (const m of ms) {
+            const slot = machineSlotWidth(m);
+            const mCenterX = mx + slot / 2;
+            pos.set(m.id, { x: mCenterX - TREE_W / 2, y: yMachine });
+
+            const list = exhibitsOf(m.data.machineId!);
+            let exX = mCenterX - exhibitRowWidth(list) / 2;
+            for (let i = 0; i < list.length; i++) {
+                const e = list[i];
+                pos.set(e.id, { x: exX, y: yExhibit });
+                const eCenterX = exX + TREE_W / 2;
+
+                const eb = bindsOfExhibit(e.data.exhibitId!);
+                const content = contentOf(eb);
+                const device = deviceOf(eb);
+                const cw = gridWidth(content.length);
+                const dw = gridWidth(device.length);
+                if (cw > 0 || dw > 0) {
+                    const total = cw + dw + (cw > 0 && dw > 0 ? H_GAP : 0);
+                    const rowLeft = eCenterX - total / 2;
+                    if (content.length > 0) {
+                        const cols = gridColumns(content.length, rowLeft, cw);
+                        content.forEach((b, k) => {
+                            pos.set(b.id, {
+                                x: cols[k % 2] - BIND_W / 2,
+                                y: yBind + Math.floor(k / 2) * (BIND_H + V_GAP),
+                            });
+                        });
+                    }
+                    if (device.length > 0) {
+                        const devLeft = rowLeft + cw + (cw > 0 ? H_GAP : 0);
+                        const cols = gridColumns(device.length, devLeft, dw);
+                        device.forEach((b, k) => {
+                            pos.set(b.id, {
+                                x: cols[k % 2] - BIND_W / 2,
+                                y: yBind + Math.floor(k / 2) * (BIND_H + V_GAP),
+                            });
+                        });
+                    }
+                }
+
+                if (i + 1 < list.length) exX += exhibitGap(e, list[i + 1]);
+            }
+
+            mx += slot + H_GAP;
+        }
+
+        // 展厅级绑定：机器行右侧（内容左、设备右）
+        if (pb.length > 0) {
+            const offset = machineAreaW > 0 ? machineAreaW + H_GAP : 0;
+            const areaLeft = pavX + offset;
+            const areaW = Math.max(0, w - offset);
+            const content = contentOf(pb);
+            const device = deviceOf(pb);
+            const cw = gridWidth(content.length);
+            const dw = gridWidth(device.length);
+            const total = cw + dw + (cw > 0 && dw > 0 ? H_GAP : 0);
+            const rowLeft = areaLeft + Math.max(0, (areaW - total) / 2);
+            if (content.length > 0) {
+                const cols = gridColumns(content.length, rowLeft, cw);
+                content.forEach((b, k) => {
+                    pos.set(b.id, {
+                        x: cols[k % 2] - BIND_W / 2,
+                        y: yMachine + Math.floor(k / 2) * (BIND_H + V_GAP),
+                    });
+                });
+            }
+            if (device.length > 0) {
+                const devLeft = rowLeft + cw + (cw > 0 ? H_GAP : 0);
+                const cols = gridColumns(device.length, devLeft, dw);
+                device.forEach((b, k) => {
+                    pos.set(b.id, {
+                        x: cols[k % 2] - BIND_W / 2,
+                        y: yMachine + Math.floor(k / 2) * (BIND_H + V_GAP),
+                    });
+                });
+            }
+        }
+
+        pavX += w + PAV_GAP;
+    }
+
     return nodes.map((n) => {
-        const p = g.node(n.id);
-        const size = NODE_SIZE[n.data.kind] ?? NODE_SIZE.bind;
-        return p ? { ...n, position: { x: p.x - size.w / 2, y: p.y - size.h / 2 } } : n;
+        const p = pos.get(n.id);
+        return p ? { ...n, position: p } : n;
     });
 }
 
@@ -279,6 +447,7 @@ function buildGraph(
                     label: m.name,
                     pavilionId: p.id,
                     pavilionName: p.name,
+                    machineId: m.id,
                     hidden: mHidden,
                 },
             });
@@ -303,6 +472,7 @@ function buildGraph(
                         pavilionName: p.name,
                         exhibitId: e.id,
                         exhibitName: e.name,
+                        machineId: m.id,
                         hidden: eHidden,
                     },
                 });

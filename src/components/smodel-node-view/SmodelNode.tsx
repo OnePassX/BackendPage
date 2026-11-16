@@ -14,11 +14,9 @@ import type { SmodelNodeData } from "./types";
 /**
  * 模式节点视图的通用节点。
  *
- * 5 种 kind 共用一个组件：
- *   mode / pavilion / machine / exhibit —— 卡片式（头部 + 内容）
- *   bind —— 紧凑胶囊式，横向平铺时不会太高：
- *            软件模式 2 行（类型+对象 / 命令）
- *            硬件模式 1 行（类型+设备+命令）
+ * 5 种 kind 共用一个组件，只按 kind 换配色与图标：
+ *   mode / pavilion / machine / exhibit —— 树节点卡片
+ *   bind —— 绑定卡片（头部 + 类型徽标/对象名 + 命令 + 延时）
  */
 
 const KIND_STYLE: Record<
@@ -31,57 +29,55 @@ const KIND_STYLE: Record<
     exhibit: { header: "bg-teal-600/85 text-white", icon: GalleryThumbnails, width: "w-44" },
 };
 
-const BIND_STYLE: Record<"content" | "device" | "hardware", string> = {
-    content: "border-amber-500/60 bg-amber-50 dark:bg-amber-950/40",
-    device: "border-emerald-500/60 bg-emerald-50 dark:bg-emerald-950/40",
-    hardware: "border-indigo-500/60 bg-indigo-50 dark:bg-indigo-950/40",
-};
-
-const BIND_BADGE: Record<"content" | "device" | "hardware", string> = {
-    content: "bg-amber-600 text-white",
-    device: "bg-emerald-600 text-white",
-    hardware: "bg-indigo-600 text-white",
+const BIND_HEADER: Record<"content" | "device" | "hardware", string> = {
+    content: "bg-amber-600/85 text-white",
+    device: "bg-emerald-600/85 text-white",
+    hardware: "bg-indigo-600/85 text-white",
 };
 
 function SmodelNode({ data, selected }: NodeProps) {
     const node = data as unknown as SmodelNodeData;
 
-    // ── 绑定节点：紧凑胶囊，软件 2 行 / 硬件 1 行 ──
+    // ── 绑定节点：卡片 ──
     if (node.kind === "bind" && node.bind) {
         const b = node.bind;
-        const oneLine = b.bindKind === "hardware";
         const command = b.code
             ? `${b.code.name}${b.code.protocal ? ` · ${b.code.protocal}` : ""}${b.code.port != null ? `/${b.code.port}` : ""}`
             : "未配置命令";
 
         return (
             <div
-                title={`${b.bindName || "-"}${command ? ` · ${command}` : ""}${b.delay > 0 ? ` · 延时 +${b.delay}ms` : ""}`}
                 className={[
-                    "w-52 rounded-md border px-2 py-1 shadow-sm transition-shadow hover:shadow-md",
-                    BIND_STYLE[b.bindKind],
-                    b.code ? "" : "border-destructive/60 border-dashed",
+                    "w-44 rounded-lg border bg-card shadow-sm transition-shadow hover:shadow-md",
+                    b.code ? "border-border" : "border-destructive/60",
+                    node.hidden ? "border-dashed opacity-60" : "",
                     selected ? "ring-4 ring-black/40 dark:ring-white/80" : "",
                 ].join(" ")}
             >
-                <div className="flex items-center gap-1">
-                    <span className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold ${BIND_BADGE[b.bindKind]}`}>
-                        {b.badge}
-                    </span>
-                    <span className="truncate text-[11px] font-medium">{b.bindName || "-"}</span>
-                    {oneLine && (
-                        <span className="ml-1 truncate text-[10px] text-muted-foreground">{command}</span>
-                    )}
-                    {b.delay > 0 && (
-                        <span className="ml-auto shrink-0 text-[9px] text-muted-foreground">+{b.delay}ms</span>
+                <div className={`flex items-center gap-2 rounded-t-lg px-3 py-1.5 ${BIND_HEADER[b.bindKind]}`}>
+                    <Boxes className="size-3.5 shrink-0" />
+                    <span className="truncate text-xs font-semibold">{node.label}</span>
+                    {node.hidden && (
+                        <Badge variant="secondary" className="ml-auto h-4 px-1 text-[9px]">隐藏</Badge>
                     )}
                 </div>
 
-                {!oneLine && (
-                    <div className={`truncate text-[10px] ${b.code ? "text-muted-foreground" : "text-destructive"}`}>
-                        {b.code ? command : <span className="inline-flex items-center gap-1"><TriangleAlert className="size-3" />{command}</span>}
+                <div className="space-y-1 px-3 py-1.5">
+                    <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="h-4 shrink-0 px-1 text-[9px]">{b.badge}</Badge>
+                        <span className="truncate text-[11px] font-medium">{b.bindName || "-"}</span>
                     </div>
-                )}
+                    <div className={`truncate text-[10px] ${b.code ? "text-muted-foreground" : "text-destructive"}`}>
+                        {b.code ? command : (
+                            <span className="inline-flex items-center gap-1">
+                                <TriangleAlert className="size-3" />{command}
+                            </span>
+                        )}
+                    </div>
+                    {b.delay > 0 && (
+                        <div className="text-[10px] text-muted-foreground">延时 +{b.delay}ms</div>
+                    )}
+                </div>
 
                 <Handle type="target" position={Position.Top} className="size-2.5! border-2! border-background! bg-muted-foreground!" />
                 <Handle type="source" position={Position.Bottom} className="size-2.5! border-2! border-background! bg-muted-foreground!" />

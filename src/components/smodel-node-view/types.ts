@@ -77,6 +77,8 @@ export interface SmodelNodeData {
     /** 所属展项；展厅级绑定为 null */
     exhibitId?: number | null;
     exhibitName?: string;
+    /** 机器（展区）id：machine 节点存自身 id，exhibit 节点存父机器 id，用于自定义布局 */
+    machineId?: number;
     /** 展项在当前模式下没有任何绑定 */
     unbound?: boolean;
     /** 绑定已存在但没配命令 */
