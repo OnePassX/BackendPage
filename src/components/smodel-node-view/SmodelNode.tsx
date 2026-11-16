@@ -9,6 +9,7 @@ import {
     TriangleAlert,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import type { SmodelNodeData } from "./types";
 
 /**
@@ -41,9 +42,6 @@ function SmodelNode({ data, selected }: NodeProps) {
     // ── 绑定节点：卡片 ──
     if (node.kind === "bind" && node.bind) {
         const b = node.bind;
-        const command = b.code
-            ? `${b.code.name}${b.code.protocal ? ` · ${b.code.protocal}` : ""}${b.code.port != null ? `/${b.code.port}` : ""}`
-            : "未配置命令";
 
         return (
             <div
@@ -67,16 +65,30 @@ function SmodelNode({ data, selected }: NodeProps) {
                         <Badge variant="outline" className="h-4 shrink-0 px-1 text-[9px]">{b.badge}</Badge>
                         <span className="truncate text-[11px] font-medium">{b.bindName || "-"}</span>
                     </div>
-                    <div className={`truncate text-[10px] ${b.code ? "text-muted-foreground" : "text-destructive"}`}>
-                        {b.code ? command : (
+                    <div className={`truncate text-[10px]`}>
+                        {
+                        b.code ? 
+                            <>
+                                <div className="w-full flex flex-row justify-between items-center">
+                                    <span className="text-[13px]">{b.code.name}</span>
+                                    <span>延时:<Badge variant="destructive" className="h-4">{b.delay}</Badge>ms</span>
+                                </div>
+                                <div className="w-full flex flex-row justify-start items-center gap-2 text-muted-foreground">
+                                    <span>{b.code.port}</span>
+                                    <Separator orientation="vertical"/>
+                                    <span>{b.code.format}</span>
+                                    <Separator orientation="vertical"/>
+                                    <span>{b.code.protocal}</span>
+                                </div>
+                                <span>CODE: {b.code.code}</span>
+                            </> 
+                        : 
                             <span className="inline-flex items-center gap-1">
-                                <TriangleAlert className="size-3" />{command}
+                                <TriangleAlert className="size-3" />未配置命令
                             </span>
-                        )}
+                        }
                     </div>
-                    {b.delay > 0 && (
-                        <div className="text-[10px] text-muted-foreground">延时 +{b.delay}ms</div>
-                    )}
+                    
                 </div>
 
                 <Handle type="target" position={Position.Top} className="size-2.5! border-2! border-background! bg-muted-foreground!" />

@@ -310,7 +310,6 @@ export function BindDialog({
                                         <>
                                             <div className="w-full flex flex-row justify-between items-center">
                                                 <span className="text-[13px]">{editing.code.name}</span>
-                                                
                                             </div>
                                             <div className="w-full flex flex-row justify-start items-center gap-2 text-muted-foreground">
                                                 <span>Port: {editing.code.port}</span>

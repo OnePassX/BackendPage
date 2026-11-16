@@ -54,7 +54,7 @@ const TREE_H = 96;
 const BIND_W = 176;
 const BIND_H = 104;
 const H_GAP = 24;
-const V_GAP = 80;
+const V_GAP = 30;
 const PAD = 24;
 const PAV_GAP = 60;
 
