@@ -26,6 +26,7 @@ import { getExhibitTree, getContentList, getControlList } from "@/api/exhibition
 import { getDeviceList, getCodeList} from "@/api/device";
 
 // import SmodelFlow from "@/components/SmodelFlow/SmodelFlow";
+import { SmodelNodeView } from "@/components/smodel-node-view";
 
 
 interface IconItem {
@@ -86,9 +87,9 @@ const TypeItems = [
 
 // --- 节点视图 ---
 function NodeViewTab() {
-    return(
-        <div className="w-full h-full flex">
-            {/* <SmodelFlow controlData={modelData}/> */}
+    return (
+        <div className="h-[calc(100dvh-220px)] w-full">
+            <SmodelNodeView />
         </div>
     );
 }
