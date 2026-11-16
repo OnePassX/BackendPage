@@ -51,6 +51,7 @@ import { DataTable } from "@/components/data-table";
 import ExhibitionFlow from "@/components/ExhibitionFlow/ExhibitionFlow";
 import ExhibitionLinkFlow from "@/components/ExhibitionLinkFlow/ExhibitionLinkFlow";
 import { DeviceCommandDrawer } from "@/components/device-command-drawer";
+import { ExhibitCommandDrawer } from "@/components/exhibit-command-drawer";
 import type { FlowNodeData } from "@/components/ExhibitionFlow/types";
 import {
 	getPavilionList, addPavilion, updatePavilion, deletePavilion,
@@ -270,6 +271,10 @@ export default function ManagePage() {
 	const [selectedDevice, setSelectedDevice] = useState<{ id: number; name: string; ip?: string } | null>(null);
 	const [deviceCommandDrawerOpen, setDeviceCommandDrawerOpen] = useState(false);
 
+	// 展项控制命令 Drawer
+	const [selectedExhibitCommand, setSelectedExhibitCommand] = useState<{ id: number; name: string; ip?: string } | null>(null);
+	const [exhibitCommandDrawerOpen, setExhibitCommandDrawerOpen] = useState(false);
+
 	const [contentDialogOpen, setContentDialogOpen] = useState(false);
 	const [contentEditing, setContentEditing] = useState<ContentItem | null>(null);
 	// 与 exhibition/content.tsx 的 defaultForm 保持一致
@@ -303,7 +308,7 @@ export default function ManagePage() {
 	// --- Exhibit dialog state ---
 	const [exhDialogOpen, setExhDialogOpen] = useState(false);
 	const [exhEditing, setExhEditing] = useState<ExhibitItem | null>(null);
-	const [exhForm, setExhForm] = useState({ e_name: "", e_m: null, e_summary: "", e_re: "", e_ip: "",e_base:"1_2_3_4_5_6", show: 1, sort:0 });
+	const [exhForm, setExhForm] = useState({ e_name: "", e_m: null, e_summary: "", e_re: "", e_ip: "", mac: "00-00-00-00-00-00",e_base:"1_2_3_4_5_6", show: 1, sort:0 });
 	
 	// —— Device dialog state ——
 	const [devDialogOpen,setDevDialogOpen] = useState(false);
@@ -431,6 +436,16 @@ export default function ManagePage() {
 		const id = editingExhibitIdRef.current;
 		if (id != null) exhibitLinkJsonRef.current.set(id, json);
 	}, []);
+
+	// --- 展项控制命令（/control，按 e_id 过滤）编辑 ---
+	const handleExhibitCommandEdit = (node: FlowNodeData) => {
+		setSelectedExhibitCommand({
+			id: node.id,
+			name: node.label,
+			ip: typeof node.e_ip === "string" ? node.e_ip : undefined,
+		});
+		setExhibitCommandDrawerOpen(true);
+	};
 
 	// --- 内容 文件下发 ---
 	const handleContentDownload = async (node: FlowNodeData) => {
@@ -646,7 +661,7 @@ export default function ManagePage() {
 	// --- 展项 新增 dialog open --- 
 	const openExhAdd = (parentNode: FlowNodeData | null) => {
 		setExhEditing(null);
-		setExhForm({ e_name: "",e_m: parentNode?.id ?? null, e_summary: "", e_re: "", e_ip: "192.168.1.255",e_base:"1_2_3_4_5_6", show: 1, sort:0 });
+		setExhForm({ e_name: "",e_m: parentNode?.id ?? null, e_summary: "", e_re: "", e_ip: "192.168.1.255", mac: "00-00-00-00-00-00",e_base:"1_2_3_4_5_6", show: 1, sort:0 });
 		setExhDialogOpen(true);
 	}
 	// --- 展项 编辑 dialog open --- 
@@ -654,7 +669,7 @@ export default function ManagePage() {
 		const e = exhibits.find((x) => x.id === node.id);
 		if (!e) return;
 		setExhEditing(e);
-		setExhForm({ e_name: e.e_name, e_m: e.e_m?.id, e_summary: e.e_summary, e_re: e.e_re, e_ip: e.e_ip, e_base: e.e_base, show: e.show, sort:e.sort });
+		setExhForm({ e_name: e.e_name, e_m: e.e_m?.id, e_summary: e.e_summary, e_re: e.e_re, e_ip: e.e_ip, mac: null, e_base: e.e_base, show: e.show, sort:e.sort });
 		setExhDialogOpen(true);
 	}
 	// --- 展项 更新/新增 方法 ---
@@ -859,6 +874,7 @@ export default function ManagePage() {
 					onContentControlEdit={handleContentControlEdit}
 					onDeviceControlEdit={handleDeviceControlEdit}
 					onExhibitControlEdit={handleExhibitControlEdit}
+					onExhibitCommandEdit={handleExhibitCommandEdit}
 					onContentDownload={handleContentDownload}
 					onDeviceProbe={handleDeviceProbe}
 					onRefresh={fetchTree}
@@ -950,6 +966,13 @@ export default function ManagePage() {
 				open={deviceCommandDrawerOpen}
 				onOpenChange={setDeviceCommandDrawerOpen}
 				device={selectedDevice}
+			/>
+
+			{/* 展项 控制命令 Drawer */}
+			<ExhibitCommandDrawer
+				open={exhibitCommandDrawerOpen}
+				onOpenChange={setExhibitCommandDrawerOpen}
+				exhibit={selectedExhibitCommand}
 			/>
 
 			{/* --- 展厅 编辑/新增 Dialog --- */}
@@ -1079,7 +1102,7 @@ export default function ManagePage() {
 								<FieldLabel htmlFor="e_summary">简介</FieldLabel>
 								<Input id="e_summary" value={exhForm.e_summary} onChange={(e) => setExhForm({ ...exhForm, e_summary: e.target.value })} placeholder="展项简介" />
 							</Field>
-							<div className="grid grid-cols-2 gap-4">
+							<div className={`grid gap-4 ${exhEditing ? ' grid-cols-2' : ' grid-cols-3'}`}>
 								<Field>
 									<FieldLabel htmlFor="e_m">展区 ID</FieldLabel>
 									<Input id="e_m" type="number" value={exhForm.e_m ?? ""} placeholder="未绑定（可在画布拖拽关联）" onChange={(e) => setExhForm({ ...exhForm, e_m: Number(e.target.value) })} disabled/>
@@ -1087,6 +1110,10 @@ export default function ManagePage() {
 								<Field>
 									<FieldLabel htmlFor="e_ip">展项 IP</FieldLabel>
 									<Input id="e_ip" value={exhForm.e_ip} onChange={(e) => setExhForm({ ...exhForm, e_ip: e.target.value })} />
+								</Field>
+								<Field className={exhEditing ? 'hidden' : ''}>
+									<FieldLabel htmlFor="e_ip">MAC 地址</FieldLabel>
+									<Input id="mac" value={exhForm.mac} onChange={(e) => setExhForm({ ...exhForm, mac: e.target.value })} />
 								</Field>
 							</div>
 							

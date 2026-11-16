@@ -19,6 +19,8 @@ export interface FlowActions {
   onDeviceControlEdit: (node: FlowNodeData) => void;
   /** 展项：编辑快捷控制（e_link） */
   onExhibitControlEdit: (node: FlowNodeData) => void;
+  /** 展项：编辑控制命令列表（/control，按 e_id 过滤） */
+  onExhibitCommandEdit: (node: FlowNodeData) => void;
   /** 内容：文件下发 */
   onContentDownload: (node: FlowNodeData) => void;
   /** 设备：手动探活 */

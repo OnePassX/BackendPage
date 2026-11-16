@@ -26,6 +26,7 @@
 | 13 | 画布没有搜索/过滤 | 第七批 | ✅ 已完成 | 2026-11-13 |
 | 23 | 设备弹窗缺「设备探活」开关 | 第八批 | ✅ 已完成 | 2026-11-13 |
 | 24 | 两个控制流程 Drawer 关闭时整树刷新，观感差 | 第九批 | ✅ 已完成 | 2026-11-13 |
+| 25 | 展项节点缺「展项控制命令」编辑入口 | 第十批 | ✅ 已完成 | 2026-11-16 |
 
 后续批次（1/2/3/6、7/9/10、8/13/14）在开工时追加到本文件。
 
@@ -841,6 +842,60 @@ setContentFormData({ ..., c_control: freshControl ?? c.c_control, ... });
   2. 内容节点 →「编辑内容」→「控制JSON」显示的是刚保存的内容；
   3. 直接点保存 → 流程图里的内容不会被覆盖；
   4. 打开控制 Drawer 也仍是最新流程。
+
+---
+
+# 第十批：展项控制命令 Drawer（2026-11-16）
+
+## 25. 展项节点缺「展项控制命令」编辑入口
+
+- **状态**：✅ 已完成
+- **位置**：`src/components/exhibit-command-drawer.tsx`（新增）、`ExhibitNode.tsx`、右键菜单、`main.tsx`
+
+**现象**
+画布上的展项节点只能编辑「展项本身」和「快捷控制（e_link）」，没有编辑该展项
+**控制命令列表**（`/control` 表，按 `e_id` 归属）的入口；该能力只存在于
+`src/app/exhibition/code.tsx` 页面。
+
+**原因**
+`FlowActions` 没有对应动作，节点菜单与右键菜单也都没有这一项。
+
+**改动**
+
+1. 新增 `src/components/exhibit-command-drawer.tsx`，结构参照 `exhibition/code.tsx`：
+
+| 项 | 实现 |
+|---|---|
+| 数据过滤 | `getControlList({ e_id: <展项id>, page: 1, limit: 1000 })`（后端 `ControlViewSet.list` 支持 `e_id`） |
+| 表格 | 复用 `DataTable`：ID / 命令名称 / 命令原文 / IP / 端口号 / 格式 / 控制协议 / 创建时间 / 操作 |
+| 新增·编辑 | Dialog，字段与 `code.tsx` 一致：命令名称、展项ID（只读）、排序、格式、通信协议、IP、端口、控制命令、备注 |
+| 批量添加 | 复用 `batchAddControl({ table_text, e_id })`，格式 `name ip port format protocal code` |
+| 删除 | 复用 `DeleteDialog` |
+| 下拉选项 | `CodeFormatItems` / `CodeProtocalItems` 与 `code.tsx` 保持一致 |
+| 默认值 | `{ cformat: 1, protocal: 4, port: 10023, sort: 0 }`，IP 预填展项 IP |
+
+2. `types.ts`：`FlowActions` 增加 `onExhibitCommandEdit(node)`；
+   `ExhibitionFlow` props / actions 同步。
+3. 入口两处：
+   - `ExhibitNode.tsx` 下拉菜单「展项控制命令」（`Terminal` 图标）；
+   - 节点右键菜单「节点操作」分组内「展项控制命令」。
+4. `main.tsx`：新增 `selectedExhibitCommand` / `exhibitCommandDrawerOpen`，
+   `handleExhibitCommandEdit` 把节点映射为 `{ id, name, ip }` 并打开 Drawer。
+
+**说明**
+与「编辑快捷控制」的区别：快捷控制编辑的是展项的 `e_link` JSON（流程图），
+「展项控制命令」编辑的是 `/control` 表里归属于该展项的命令记录（列表），二者互不影响。
+Drawer 内的增删改只刷新 Drawer 自身列表，不触发画布 `fetchTree`。
+
+**验证**
+- `tsc`：6 个错误（与改动前一致）。
+- `npm run lint`：116 warnings（不变）。
+- 手工（待浏览器确认）：
+  1. 展项节点 ⋮ →「展项控制命令」→ Drawer 打开，标题为展项名、副标题为展项 IP；
+  2. 列表只显示该展项的命令；
+  3. 新增/编辑/删除/批量添加后列表即时刷新；
+  4. 右键菜单同样可用；
+  5. 关闭 Drawer 后画布不刷新、节点位置不变。
 
 ---
 

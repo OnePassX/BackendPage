@@ -389,6 +389,8 @@ export interface ExhibitionFlowProps {
     onDeviceControlEdit: (node: FlowNodeData) => void;
     /** 展项：打开快捷控制（e_link）编辑 */
     onExhibitControlEdit: (node: FlowNodeData) => void;
+    /** 展项：编辑控制命令列表 */
+    onExhibitCommandEdit: (node: FlowNodeData) => void;
     /** 内容：下发文件到设备 */
     onContentDownload: (node: FlowNodeData) => void;
     /** 设备：手动探活 */
@@ -416,6 +418,7 @@ function ExhibitionFlowInner({
     onContentControlEdit,
     onDeviceControlEdit,
     onExhibitControlEdit,
+    onExhibitCommandEdit,
     onContentDownload,
     onDeviceProbe,
     onRefresh,
@@ -478,8 +481,8 @@ function ExhibitionFlowInner({
 
     // Stable callbacks context
     const actions = useMemo<FlowActions>(
-        () => ({ onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onContentDownload, onDeviceProbe }),
-        [onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onContentDownload, onDeviceProbe],
+        () => ({ onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onExhibitCommandEdit, onContentDownload, onDeviceProbe }),
+        [onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onExhibitCommandEdit, onContentDownload, onDeviceProbe],
     );
 
     // Unlinked items (no parent): shown in the sidebar instead of the canvas.
@@ -635,6 +638,7 @@ function ExhibitionFlowInner({
             const actionItems = [];
             if (node.kind === "exhibit") {
                 actionItems.push({ label: "编辑快捷控制", icon: SlidersHorizontal, onSelect: () => onExhibitControlEdit(node) });
+                actionItems.push({ label: "展项控制命令", icon: Terminal, onSelect: () => onExhibitCommandEdit(node) });
             } else if (node.kind === "content") {
                 actionItems.push({ label: "编辑软件控制命令", icon: Code, onSelect: () => onContentControlEdit(node) });
                 actionItems.push({ label: "文件下发", icon: Send, onSelect: () => onContentDownload(node) });
@@ -659,7 +663,7 @@ function ExhibitionFlowInner({
                 ],
             },
         ];
-    }, [onAddChild, onAddNode, onContentControlEdit, onContentDownload, onDelete, onDeviceControlEdit, onDeviceProbe, onEdit, onExhibitControlEdit, onRefresh, reactFlowInstance]);
+    }, [onAddChild, onAddNode, onContentControlEdit, onContentDownload, onDelete, onDeviceControlEdit, onDeviceProbe, onEdit, onExhibitCommandEdit, onExhibitControlEdit, onRefresh, reactFlowInstance]);
 
     const onDrop = useCallback(
         (event: DragEvent) => {
