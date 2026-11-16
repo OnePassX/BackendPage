@@ -343,17 +343,17 @@ export default function DevicePage() {
                 <span className="text-xs">{row.ip}</span>
                 :
                 <span className="text-xs text-muted-foreground">{"端口："+row.cport}</span>
-            ) 
+            )
         },
         { 
             id: "num", 
             label: "设备编号",
-            className: "max-w-50 w-auto ",
+            className: "max-w-50 w-auto",
             cell: (row) => (
                 row.type == "device" ?
                 <span className="text-xs ">{row.num || "-"}</span>
                 :
-                <span className="text-xs text-muted-foreground text-wrap">{"命令："+row.code}</span>
+                <span className="text-xs text-muted-foreground text-wrap wrap-normal break-all">{"命令："+row.code}</span>
             )
         },
         {   

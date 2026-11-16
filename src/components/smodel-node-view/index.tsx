@@ -54,7 +54,8 @@ const NODE_SIZE: Record<SmodelNodeData["kind"], { w: number; h: number }> = {
     pavilion: { w: 176, h: 60 },
     machine: { w: 160, h: 52 },
     exhibit: { w: 176, h: 76 },
-    bind: { w: 208, h: 88 },
+    // 绑定节点是紧凑胶囊：软件 2 行 / 硬件 1 行
+    bind: { w: 208, h: 56 },
 };
 
 const nodeTypes = { smodel: SmodelNode };
@@ -152,7 +153,8 @@ async function fetchBinds(
 
 function layout(nodes: Node<SmodelNodeData>[], edges: Edge[]): Node<SmodelNodeData>[] {
     const g = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-    g.setGraph({ rankdir: "LR", nodesep: 24, ranksep: 90, marginx: 24, marginy: 24 });
+    // TB：层级自上而下，同级节点（尤其是同一展项下的多个绑定）会横向平铺而不是纵向堆叠
+    g.setGraph({ rankdir: "TB", nodesep: 28, ranksep: 90, marginx: 24, marginy: 24 });
     nodes.forEach((n) => {
         const size = NODE_SIZE[n.data.kind] ?? NODE_SIZE.bind;
         g.setNode(n.id, { width: size.w, height: size.h });

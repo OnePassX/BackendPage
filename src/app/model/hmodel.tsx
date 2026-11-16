@@ -89,7 +89,7 @@ export default function HardwareModelPage() {
     return (
         <div className="flex flex-col gap-4 px-4 lg:px-6 w-full h-full">
             <h1 className="text-xl font-semibold">硬件模式管理</h1>
-            <Tabs defaultValue="tableView" className="w-full min-h-0 flex-1 flex flex-col">
+            <Tabs defaultValue="nodeView" className="w-full min-h-0 flex-1 flex flex-col">
                 <TabsList>
                     <TabsTrigger value="nodeView">节点视图</TabsTrigger>
                     <TabsTrigger value="tableView">表格视图</TabsTrigger>

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
     addHmodelBind,
     addSmodelBind,
@@ -304,9 +305,25 @@ export function BindDialog({
                                 <Field>
                                     <FieldLabel>命令</FieldLabel>
                                     <div className="text-sm text-muted-foreground">
-                                        {editing?.code
-                                            ? `${editing.code.name}${editing.code.protocal ? ` · ${editing.code.protocal}` : ""}`
-                                            : "未配置"}
+                                    {
+                                        editing?.code? 
+                                        <>
+                                            <div className="w-full flex flex-row justify-between items-center">
+                                                <span className="text-[13px]">{editing.code.name}</span>
+                                                
+                                            </div>
+                                            <div className="w-full flex flex-row justify-start items-center gap-2 text-muted-foreground">
+                                                <span>Port: {editing.code.port}</span>
+                                                <Separator orientation="vertical"/>
+                                                <span>{editing.code.format}</span>
+                                                <Separator orientation="vertical"/>
+                                                <span>{editing.code.protocal}</span>
+                                            </div>
+                                            <span>CODE: {editing.code.code}</span>
+                                        </>    
+                                        : 
+                                            "未配置"
+                                    }
                                     </div>
                                 </Field>
                                 <Field>
