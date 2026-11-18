@@ -27,6 +27,7 @@
 | 23 | 设备弹窗缺「设备探活」开关 | 第八批 | ✅ 已完成 | 2026-11-13 |
 | 24 | 两个控制流程 Drawer 关闭时整树刷新，观感差 | 第九批 | ✅ 已完成 | 2026-11-13 |
 | 25 | 展项节点缺「展项控制命令」编辑入口 | 第十批 | ✅ 已完成 | 2026-11-16 |
+| 26 | 刷新后视口重置、节点位置丢失 | 第十一批 | ✅ 已完成 | 2026-11-18 |
 
 后续批次（1/2/3/6、7/9/10、8/13/14）在开工时追加到本文件。
 
@@ -896,6 +897,69 @@ Drawer 内的增删改只刷新 Drawer 自身列表，不触发画布 `fetchTree
   3. 新增/编辑/删除/批量添加后列表即时刷新；
   4. 右键菜单同样可用；
   5. 关闭 Drawer 后画布不刷新、节点位置不变。
+
+---
+
+# 第十一批：刷新不再重置视口与节点位置（2026-11-18）
+
+## 26. fetchTree 后画布回到全图适配、节点位置重置
+
+- **状态**：✅ 已完成
+- **位置**：`src/app/main.tsx`、`src/components/ExhibitionFlow/ExhibitionFlow.tsx`
+
+**现象**
+每次新增/编辑/删除节点、连线、探活等操作后，画布会缩放回"全图适配"的位置，
+之前拖动过的节点也回到自动布局的位置，用户得重新找节点。
+
+**原因（两处叠加）**
+
+1. `fetchTree()` 会 `setTreeLoading(true)` → `loading` 传到 `ExhibitionFlow`，
+   而它在 `loading` 为 true 时直接 `return` 一个「加载中...」占位（卸载整块画布）；
+   请求结束后 `<ReactFlow>` 重新挂载，`fitView={true}` 再次执行 → 视口重置。
+2. 重建 effect 里 `setNodes(nn)` 直接用布局算出的位置覆盖，手动拖动的位置丢失。
+
+**改动**
+
+1. `main.tsx`：
+   - `fetchTree(silent = false)`：`silent` 时不置 `treeLoading`，改为 `refreshing` 状态；
+   - 首次加载仍走 `fetchTree()`（显示加载态），**其余 20 处调用全部改为 `fetchTree(true)`**；
+   - 右键「刷新节点」改为 `onRefresh={() => fetchTree(true)}`；
+   - 新增 `refreshing` 状态并传给画布。
+2. `ExhibitionFlow.tsx`：
+   - 新增可选属性 `refreshing`，在画布右上角显示**不卸载画布**的「刷新中...」角标；
+   - 重建 effect 改为按 id 合并旧位置：
+
+```tsx
+setNodes((current) => {
+    if (current.length === 0) return nn;
+    const prev = new Map(current.map((n) => [n.id, n.position]));
+    return nn.map((n) => (prev.has(n.id) ? { ...n, position: prev.get(n.id)! } : n));
+});
+```
+
+   - 视口保存/恢复：`onMove` 把视口记到 `viewportRef`；`fitView={!viewportRef.current}`，
+     有保存值时不再适配，改由 `onInit` 调 `setViewport` 恢复；
+     `defaultViewport` 也优先用保存值，避免重挂载瞬间的闪烁；
+   - 画布右键菜单新增「**重新布局**」：强制按布局算法重排并 fitView，
+     用于新增节点与旧位置重叠、或父子关系变更后手动整理。
+
+**行为变化**
+
+| 操作 | 之前 | 现在 |
+|---|---|---|
+| 新增/编辑/删除节点 | 缩放回全图 + 节点重排 | 视口与已有节点位置都不动，新节点出现在布局位置 |
+| 连线 / 探活 / 切换内容 | 同上 | 同上 |
+| 切 Tab 再回来 | 重新 fitView | 恢复上次视口 |
+| 想整理布局 | 无入口 | 右键「重新布局」 |
+
+**验证**
+- `tsc`：6 个错误（与基线一致）。
+- `npm run lint`：0 errors / 126 warnings（不变）。
+- 手工（待浏览器确认）：
+  1. 拖几个节点、缩放到某个局部 → 编辑任一节点保存 → 画面不跳、节点不回位；
+  2. 右上角短暂出现「刷新中...」角标，画布不闪加载页；
+  3. 右键空白 →「重新布局」→ 节点按算法重排并适配视图；
+  4. 切到别的页面再回来 → 视口保持。
 
 ---
 

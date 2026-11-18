@@ -19,7 +19,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { Loader2, FileIcon } from "lucide-react";
 import { Building2Icon, Columns2, GalleryThumbnails,CodeXml,Code,PanelLeftIcon} from "lucide-react";
-import { PencilIcon, Trash2Icon, PlusIcon, RefreshCwIcon, Maximize, SlidersHorizontal, Send, Terminal, Wifi, SearchIcon, XIcon, CornerDownLeft } from "lucide-react";
+import { PencilIcon, Trash2Icon, PlusIcon, RefreshCwIcon, Maximize, SlidersHorizontal, Send, Terminal, Wifi, SearchIcon, XIcon, CornerDownLeft, LayoutGrid } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import ContextMenu from "./ContextMenu" 
@@ -399,6 +399,8 @@ export interface ExhibitionFlowProps {
     onDeviceProbe: (node: FlowNodeData) => void;
     /** 画布右键菜单：重新拉取节点数据 */
     onRefresh?: () => void;
+    /** 静默刷新中：只在画布内显示角标，不卸载画布 */
+    refreshing?: boolean;
 }
 
 // ── Inner component (needs ReactFlowProvider context) ──
@@ -425,6 +427,7 @@ function ExhibitionFlowInner({
     onContentDefaultChange,
     onDeviceProbe,
     onRefresh,
+    refreshing = false,
 }: ExhibitionFlowProps) {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -432,6 +435,11 @@ function ExhibitionFlowInner({
     const reactFlowInstance = useReactFlow();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const ref = useRef(null);
+    /**
+     * 最近一次视口。画布若因 loading 被卸载重挂载（切 Tab、路由回来等），
+     * 用它恢复位置与缩放，而不是让 fitView 重新适配全图。
+     */
+    const viewportRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
  
     const [contextMenu, setContextMenu] = useState(null);
 
@@ -515,10 +523,27 @@ function ExhibitionFlowInner({
             contents,
             // selectedExhibitId,
         });
-        setNodes(nn);
+        // 保留已有节点的位置：刷新数据后画面不跳动，用户不用重新找节点。
+        // 新增节点用布局算出的位置，删除的节点自然消失。
+        setNodes((current) => {
+            if (current.length === 0) return nn;
+            const prev = new Map(current.map((n) => [n.id, n.position]));
+            return nn.map((n) => {
+                const p = prev.get(n.id);
+                return p ? { ...n, position: p } : n;
+            });
+        });
         setEdges(ne);
         setInitialized(true);
     }, [pavilions, machines, exhibits, devices, contents, loading, setNodes, setEdges]);
+
+    /** 强制按布局算法重排（右键菜单「重新布局」） */
+    const relayout = useCallback(() => {
+        const { nodes: nn, edges: ne } = buildFlow({ pavilions, machines, exhibits, devices, contents });
+        setNodes(nn);
+        setEdges(ne);
+        requestAnimationFrame(() => reactFlowInstance.fitView({ padding: 0.3, minZoom: 0.5, maxZoom: 1.5 }));
+    }, [pavilions, machines, exhibits, devices, contents, setNodes, setEdges, reactFlowInstance]);
 
     const hasData = nodes.length > 0;
 
@@ -663,11 +688,12 @@ function ExhibitionFlowInner({
                 items: [
                     { label: "添加展厅", icon: Building2Icon, onSelect: () => onAddNode?.("pavilion") },
                     { label: "刷新节点", icon: RefreshCwIcon, onSelect: () => onRefresh?.() },
+                    { label: "重新布局", icon: LayoutGrid, onSelect: () => relayout() },
                     { label: "适应视图", icon: Maximize, onSelect: () => reactFlowInstance.fitView({ duration: 300 }) },
                 ],
             },
         ];
-    }, [onAddChild, onAddNode, onContentControlEdit, onContentDownload, onContentDefaultChange, onDelete, onDeviceControlEdit, onDeviceProbe, onEdit, onExhibitCommandEdit, onExhibitControlEdit, onRefresh, reactFlowInstance]);
+    }, [onAddChild, onAddNode, onContentControlEdit, onContentDownload, onContentDefaultChange, onDelete, onDeviceControlEdit, onDeviceProbe, onEdit, onExhibitCommandEdit, onExhibitControlEdit, onRefresh, reactFlowInstance, relayout]);
 
     const onDrop = useCallback(
         (event: DragEvent) => {
@@ -769,9 +795,16 @@ function ExhibitionFlowInner({
                         // 拖拽事件
                         onDragOver={onDragOver} 
                         // 设置视口的初始位置和缩放比例。如果系统提供了默认视口，但 fitView 处于启用状态，则默认视口将被忽略。
-                        defaultViewport={defaultViewport} 
+                        defaultViewport={viewportRef.current ?? defaultViewport} 
+                        // 画布重新挂载时（如切 Tab 回来）恢复上次视口，避免又缩放回全图
+                        onInit={(instance) => {
+                            if (viewportRef.current) instance.setViewport(viewportRef.current);
+                        }}
+                        // 记录视口，供重新挂载时恢复
+                        onMove={(_, vp) => { viewportRef.current = vp; }}
                         // 当 true 时，画面会自动缩放和平移，以显示最初所显示的所有节点
-                        fitView = {true}
+                        // 已有保存的视口时不再 fitView，交给 onInit 恢复
+                        fitView={!viewportRef.current}
                         // 配置视口缩放和平移选项
                         fitViewOptions={{ padding: 0.3, minZoom: 0.5, maxZoom: 1.5 }}
                         // 节点是否可拖动
@@ -902,7 +935,13 @@ function ExhibitionFlowInner({
                         }
                     </ReactFlow>
 
-                    
+                    {/* 静默刷新角标：不卸载画布，只提示数据正在更新 */}
+                    {refreshing && (
+                        <div className="pointer-events-none absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-md border border-border bg-card/95 px-2 py-1 text-xs text-muted-foreground shadow-sm">
+                            <Loader2 className="size-3 animate-spin" />
+                            刷新中...
+                        </div>
+                    )}
                 </div>
             </div>
         </FlowActionsContext.Provider>

@@ -246,6 +246,8 @@ export default function ManagePage() {
 	const [contents,setContents] = useState<ContentItem[]>([]);
 
 	const [treeLoading, setTreeLoading] = useState(true);
+	/** 静默刷新中（不卸载画布，仅在画布内显示小角标） */
+	const [refreshing, setRefreshing] = useState(false);
 
 	const [selectedContent, setSelectedContent] = useState<FlowNodeData | null>(null);
 	const [contentControlDrawerOpen, setContentControlDrawerOpen] = useState(false);
@@ -327,9 +329,16 @@ export default function ManagePage() {
 		return [];
 	};
 
-	// 获取展厅数据
-	const fetchTree = async () => {
-		setTreeLoading(true);
+	/**
+	 * 拉取树数据。
+	 *
+	 * silent = true 时不再置 treeLoading —— 那会让 ExhibitionFlow 卸载整块画布、
+	 * 重新挂载后 fitView 把视口重置回全图。静默刷新只更新数据，
+	 * 画布、视口、节点位置都保持不动（节点位置由 ExhibitionFlow 按 id 合并保留）。
+	 */
+	const fetchTree = async (silent = false) => {
+		if (silent) setRefreshing(true);
+		else setTreeLoading(true);
 		try {
 			const [pRes, mRes, eRes, dRes, cRes] = await Promise.all([
 				getPavilionList({show:1, page:1, limit:1000}),
@@ -355,7 +364,8 @@ export default function ManagePage() {
 		} catch (e: unknown) {
 			toast.error(e instanceof Error ? e.message : "加载树结构失败");
 		} finally {
-			setTreeLoading(false);
+			if (silent) setRefreshing(false);
+			else setTreeLoading(false);
 		}
 	};
 
@@ -462,7 +472,7 @@ export default function ManagePage() {
 		try {
 			const res = await updateContentDefault({ id: node.id, default: 1 });
 			toast.success(res?.msg || "已设为默认");
-			fetchTree();
+			fetchTree(true);
 		} catch (e: unknown) {
 			toast.error(e instanceof Error ? e.message : "设置失败");
 		}
@@ -473,7 +483,7 @@ export default function ManagePage() {
 		try {
 			const res = await probeDevice({ device_id: node.id });
 			toast.success(res?.msg || "探活已下发");
-			fetchTree();
+			fetchTree(true);
 		} catch (e: unknown) {
 			toast.error(e instanceof Error ? e.message : "探活失败");
 		}
@@ -505,7 +515,7 @@ export default function ManagePage() {
 				if(source.id !== target.m_p ){ 
 					await updateMachineLink({ id: target.id, m_p: source.id });
 					toast.success("展区已关联到展厅");
-					fetchTree();
+					fetchTree(true);
 				}else{
 					toast.warning("不可重复连接！");
 				}
@@ -513,7 +523,7 @@ export default function ManagePage() {
 				if(source.id !== target.e_m ){ 
 					await updateExhibitLink({ id: target.id, e_m: source.id });
 					toast.success("展项已关联到展区");
-					fetchTree();
+					fetchTree(true);
 				}else{
 					toast.warning("不可重复连接！");
 				}
@@ -522,7 +532,7 @@ export default function ManagePage() {
 				if(source.id !== target.link){
 					await updateDeviceLink({ id: target.id, area:2, link: source.id });
 					toast.success("设备已关联到展厅");
-					fetchTree();
+					fetchTree(true);
 				}else{
 					toast.warning("不可重复连接！");
 				}
@@ -531,7 +541,7 @@ export default function ManagePage() {
 				if(source.id !== target.link){
 					await updateDeviceLink({ id: target.id, area:1, link: source.id });
 					toast.success("设备已关联到展项");
-					fetchTree();
+					fetchTree(true);
 				}else{
 					toast.warning("不可重复连接！");
 				}
@@ -552,25 +562,25 @@ export default function ManagePage() {
 				if (target.m_p != null) {
 					await updateMachineLink({ id: target.id, m_p: null });
 					toast.success("展区已取消关联");
-					fetchTree();
+					fetchTree(true);
 				}
 			}else if (source.kind === "machine" && target.kind === "exhibit") {
 				if (target.e_m != null) {
 					await updateExhibitLink({ id: target.id, e_m: null });
 					toast.success("展项已取消关联");
-					fetchTree();
+					fetchTree(true);
 				}
 			}else if (source.kind === "pavilion" && target.kind === "device") {
 				if (target.link != null) {
 					await updateDeviceLink({ id: target.id, area:2, link: null });
 					toast.success("设备已取消关联");
-					fetchTree();
+					fetchTree(true);
 				}
 			}else if (source.kind === "exhibit" && target.kind === "device") {
 				if (target.link != null) {
 					await updateDeviceLink({ id: target.id, area:1, link: null });
 					toast.success("设备已取消关联");
-					fetchTree();
+					fetchTree(true);
 				}
 			}
 		}catch(e:unknown){
@@ -603,7 +613,7 @@ export default function ManagePage() {
 				toast.success("展馆添加成功");
 			}
 			setPavDialogOpen(false);
-			fetchTree();
+			fetchTree(true);
 		} catch (e: unknown) {
 			toast.error(e instanceof Error ? e.message : "操作失败");
 		}
@@ -617,7 +627,7 @@ export default function ManagePage() {
 			onConfirm: async () => {
 				await deletePavilion(node.id);
 				toast.success("展馆已删除");
-				fetchTree();
+				fetchTree(true);
 			},
 		});
 	};
@@ -650,7 +660,7 @@ export default function ManagePage() {
 				toast.success("展区添加成功");
 			}
 			setMacDialogOpen(false);
-			fetchTree();
+			fetchTree(true);
 		} catch (e: unknown) {
 			toast.error(e instanceof Error ? e.message : "操作失败");
 		}
@@ -664,7 +674,7 @@ export default function ManagePage() {
 			onConfirm: async () => {
 				await deleteMachine(node.id);
 				toast.success("展项已删除");
-				fetchTree();
+				fetchTree(true);
 			},
 		});
 	};
@@ -697,7 +707,7 @@ export default function ManagePage() {
 				toast.success("展项添加成功");
 			}
 			setExhDialogOpen(false);
-			fetchTree();
+			fetchTree(true);
 		} catch (e: unknown) {
 			toast.error(e instanceof Error ? e.message : "操作失败");
 		}
@@ -711,7 +721,7 @@ export default function ManagePage() {
 			onConfirm: async () => {
 				await deleteExhibit(node.id);
 				toast.success("展品已删除");
-				fetchTree();
+				fetchTree(true);
 			},
 		});
 	};
@@ -743,7 +753,7 @@ export default function ManagePage() {
 				toast.success("设备添加成功");
 			}
 			setDevDialogOpen(false);
-			fetchTree();
+			fetchTree(true);
 		} catch (e: unknown) {
 			toast.error(e instanceof Error ? e.message : "操作失败");
 		}
@@ -757,7 +767,7 @@ export default function ManagePage() {
 			onConfirm: async () => {
 				await deleteDevice(node.id);
 				toast.success("设备已删除");
-				fetchTree();
+				fetchTree(true);
 			},
 		});
 	};
@@ -810,7 +820,7 @@ export default function ManagePage() {
 				toast.success("添加成功");
 			}
 			setContentDialogOpen(false);
-			fetchTree();
+			fetchTree(true);
 		} catch (e: unknown) {
 			toast.error(e instanceof Error ? e.message : "操作失败");
 		}
@@ -824,7 +834,7 @@ export default function ManagePage() {
 			onConfirm: async () => {
 				await deleteContent(node.id);
 				toast.success("删除成功");
-				fetchTree();
+				fetchTree(true);
 			},
 		});
 	};
@@ -876,6 +886,7 @@ export default function ManagePage() {
 					contents={contents}
 					// selectedExhibitId={selectedContent?.id ?? null}
 					loading={treeLoading}
+					refreshing={refreshing}
 					onAddChild={handleAddChild}
 					onEdit={handleEdit}
 					onDelete={handleDelete}
@@ -889,7 +900,7 @@ export default function ManagePage() {
 					onContentDownload={handleContentDownload}
 					onContentDefaultChange={handleContentDefaultChange}
 					onDeviceProbe={handleDeviceProbe}
-					onRefresh={fetchTree}
+					onRefresh={() => fetchTree(true)}
 				/>
 			</div>
 
