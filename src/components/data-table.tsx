@@ -82,6 +82,8 @@ export interface DataTableProps<T> {
   onReorder?: (data: T[]) => void
   /** Extract a stable id from a row (defaults to (row as any).id) */
   getRowId?: (row: T) => number | string
+  children?: React.ReactNode
+  tableRef?: React.RefObject<any>
 }
 
 // ── Drag Handle (exported for use in parent column definitions) ──
@@ -142,6 +144,8 @@ export function DataTable<T>({
   onSelectionChange,
   onReorder,
   getRowId,
+  children,
+  tableRef,
 }: DataTableProps<T>) {
   // Detect features from column IDs
   const hasDrag = React.useMemo(() => columns.some((c) => c.id === "drag"), [columns])
@@ -172,6 +176,7 @@ export function DataTable<T>({
     }
   }, [rowSelection, onSelectionChange])
 
+
   const table = useReactTable({
     data: internalData,
     columns,
@@ -198,6 +203,7 @@ export function DataTable<T>({
     columnResizeMode: "onChange",
     enableColumnPinning: true,
     getRowId: getRowId ? ((row) => String(getRowId(row))) : undefined,
+    autoResetPageIndex: false, //turn off auto reset of pageIndex
     initialState: {
       pagination: { pageSize },
       columnPinning: { left: ['select',], right: ['actions',] },
@@ -205,6 +211,10 @@ export function DataTable<T>({
   })
   // console.log(table)
   const totalCols = columns.length
+
+  React.useEffect(() => {
+    if (tableRef) tableRef.current = table
+  })  // 故意不写依赖数组：每次提交后同步最新实例
 
   // ── dnd-kit sensors ──
   const sensors = useSensors(
@@ -232,7 +242,7 @@ export function DataTable<T>({
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <div className="relative w-72">
             <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
@@ -243,36 +253,40 @@ export function DataTable<T>({
               onChange={(e) => setGlobalFilter(e.target.value)}
             />
           </div>
+          
           {hasSelection && selectedCount > 0 && (
             <span className="text-sm text-muted-foreground">
               已选 {selectedCount} 项
             </span>
           )}
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="outline" size="sm">
-                <Columns3Icon className="mr-1 size-4" /> 列显示
-                <ChevronDownIcon className="ml-1 size-3" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter((col) => col.getCanHide())
-              .map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                >
-                  {String(col.columnDef.header ?? col.id)}
-                </DropdownMenuCheckboxItem>
-              ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" size="default">
+                  <Columns3Icon className="mr-1 size-4" /> 列显示
+                  <ChevronDownIcon className="ml-1 size-3" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((col) => col.getCanHide())
+                .map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                  >
+                    {String(col.columnDef.header ?? col.id)}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {children}
+        </div>
       </div>
 
       {/* Table */}
@@ -402,7 +416,7 @@ export function DataTable<T>({
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-muted-foreground hidden md:block">
           共 {table.getFilteredRowModel().rows.length} 条
         </div>
         <div className="flex items-center gap-2">

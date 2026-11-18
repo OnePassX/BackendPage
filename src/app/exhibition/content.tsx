@@ -622,7 +622,7 @@ export default function ContentPage() {
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col gap-2">
                     <span className="text-sm font-medium">
-                       <span className="text-muted-foreground">展项内容管理</span> 
+                       <span className="text-muted-foreground">展项内容管理列表</span> 
                     </span>
                     {selected ? (
                         <div className="flex flex-col gap-2">
@@ -637,7 +637,7 @@ export default function ContentPage() {
                                     columns={columns}
                                     data={data}
                                     loading={loading}
-                                    pageSize={18}
+                                    pageSize={20}
                                     searchPlaceholder="搜索指令名称/码..."
                                     onReorder={handleReorder}
                                     getRowId={(row) => row.id}

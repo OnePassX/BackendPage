@@ -301,7 +301,7 @@ export function ExhibitCommandDrawer({ open, onOpenChange, exhibit }: ExhibitCom
                                 data={data}
                                 loading={loading}
                                 searchPlaceholder="搜索命令名称/原文/IP..."
-                                pageSize={10}
+                                pageSize={18}
                             />
                         </div>
 

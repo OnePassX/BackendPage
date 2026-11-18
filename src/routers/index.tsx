@@ -29,6 +29,8 @@ import HardwareModelPage from "@/app/model/hmodel";
 
 import ProcessPage from "@/app/model/process";
 
+import LogPage from "@/app/log/index";
+
 
 const routers = [
     { title: '后台登录', path: '/', element: <BackendLogin /> },
@@ -69,7 +71,7 @@ const routers = [
 
         { path: 'process', element: <ProcessPage /> },
         
-
+        { path: 'backendlog', element: <LogPage /> },
         // Wildcard: catches any /server/:path not matched above
         // Shows the menu item name from API, or "页面组件待实现"
         { path: '*', element: <MenuRoutePage /> },

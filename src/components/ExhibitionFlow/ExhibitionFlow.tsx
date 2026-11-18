@@ -19,7 +19,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { Loader2, FileIcon } from "lucide-react";
 import { Building2Icon, Columns2, GalleryThumbnails,CodeXml,Code,PanelLeftIcon} from "lucide-react";
-import { PencilIcon, Trash2Icon, PlusIcon, RefreshCwIcon, Maximize, SlidersHorizontal, Send, Terminal, Wifi, SearchIcon, XIcon } from "lucide-react";
+import { PencilIcon, Trash2Icon, PlusIcon, RefreshCwIcon, Maximize, SlidersHorizontal, Send, Terminal, Wifi, SearchIcon, XIcon, CornerDownLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import ContextMenu from "./ContextMenu" 
@@ -393,6 +393,8 @@ export interface ExhibitionFlowProps {
     onExhibitCommandEdit: (node: FlowNodeData) => void;
     /** 内容：下发文件到设备 */
     onContentDownload: (node: FlowNodeData) => void;
+    /** 内容：切换默认文件 */
+    onContentDefaultChange: (node: FlowNodeData) => void;
     /** 设备：手动探活 */
     onDeviceProbe: (node: FlowNodeData) => void;
     /** 画布右键菜单：重新拉取节点数据 */
@@ -420,6 +422,7 @@ function ExhibitionFlowInner({
     onExhibitControlEdit,
     onExhibitCommandEdit,
     onContentDownload,
+    onContentDefaultChange,
     onDeviceProbe,
     onRefresh,
 }: ExhibitionFlowProps) {
@@ -481,8 +484,8 @@ function ExhibitionFlowInner({
 
     // Stable callbacks context
     const actions = useMemo<FlowActions>(
-        () => ({ onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onExhibitCommandEdit, onContentDownload, onDeviceProbe }),
-        [onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onExhibitCommandEdit, onContentDownload, onDeviceProbe],
+        () => ({ onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onExhibitCommandEdit, onContentDownload,onContentDefaultChange, onDeviceProbe }),
+        [onAddChild, onEdit, onDelete, onContentControlEdit, onDeviceControlEdit, onExhibitControlEdit, onExhibitCommandEdit, onContentDownload,onContentDefaultChange, onDeviceProbe],
     );
 
     // Unlinked items (no parent): shown in the sidebar instead of the canvas.
@@ -642,6 +645,7 @@ function ExhibitionFlowInner({
             } else if (node.kind === "content") {
                 actionItems.push({ label: "编辑软件控制命令", icon: Code, onSelect: () => onContentControlEdit(node) });
                 actionItems.push({ label: "文件下发", icon: Send, onSelect: () => onContentDownload(node) });
+                actionItems.push({ label: "切换到此内容", icon: CornerDownLeft, onSelect: () => onContentDefaultChange(node) });
             } else if (node.kind === "device") {
                 actionItems.push({ label: "设备命令", icon: Terminal, onSelect: () => onDeviceControlEdit(node) });
                 actionItems.push({ label: "设备探活", icon: Wifi, onSelect: () => onDeviceProbe(node) });
@@ -663,7 +667,7 @@ function ExhibitionFlowInner({
                 ],
             },
         ];
-    }, [onAddChild, onAddNode, onContentControlEdit, onContentDownload, onDelete, onDeviceControlEdit, onDeviceProbe, onEdit, onExhibitCommandEdit, onExhibitControlEdit, onRefresh, reactFlowInstance]);
+    }, [onAddChild, onAddNode, onContentControlEdit, onContentDownload, onContentDefaultChange, onDelete, onDeviceControlEdit, onDeviceProbe, onEdit, onExhibitCommandEdit, onExhibitControlEdit, onRefresh, reactFlowInstance]);
 
     const onDrop = useCallback(
         (event: DragEvent) => {

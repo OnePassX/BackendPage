@@ -23,6 +23,8 @@ export interface FlowActions {
   onExhibitCommandEdit: (node: FlowNodeData) => void;
   /** 内容：文件下发 */
   onContentDownload: (node: FlowNodeData) => void;
+  /** 内容：文件切换 */
+  onContentDefaultChange: (node: FlowNodeData) => void;
   /** 设备：手动探活 */
   onDeviceProbe: (node: FlowNodeData) => void;
 }

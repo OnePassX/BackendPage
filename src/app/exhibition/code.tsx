@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { PencilIcon, Trash2Icon, PlusIcon, Building2Icon, ChevronDownIcon, CircleDot } from "lucide-react";
+import { PencilIcon, Trash2Icon, PlusIcon, Building2Icon, ChevronDownIcon, CircleDot, RefreshCw, ListPlus } from "lucide-react";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger, PopoverTitle } from "@/components/ui/popover";
 import { DeleteDialog } from "@/components/delete-dialog";
-
+import { TipButton } from "@/components/tip-button";
 // 类型
 interface typeItem {
     id: number;
@@ -52,6 +52,8 @@ const defaultForm = { e_id: null, name: '', cformat: 1, protocal: 4, ip:'', code
 
 export default function ContentCodePage() {
 
+    const tableRef = useRef<any>(null);
+
     // --- 设备列表 ---
     const [tree, setTree] = useState<any>(null);
     const [treeLoading, setTreeLoading] = useState(true);
@@ -74,7 +76,7 @@ export default function ContentCodePage() {
         try {
             const res = await getExhibitTree();
             setTree(res.data || []);
-            setSelected({ e_id: 0, ip:'', label:'无绑定命令' });
+            setSelected({ e_id: 0, ip:'', label:'全局命令' });
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "加载失败");
         } finally {
@@ -95,6 +97,7 @@ export default function ContentCodePage() {
             } else {
                 setData([]);
             }
+            
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : "加载失败");
         } finally {
@@ -105,7 +108,7 @@ export default function ContentCodePage() {
 
     useEffect(() => { fetchTree(); }, []);
 
-    useEffect(() => { fetchData(selected); }, [selected]);
+    useEffect(() => { fetchData(selected);tableRef.current?.resetPageIndex();}, [selected]);
 
     const openAdd = () => {
         setEditing(null);
@@ -271,12 +274,7 @@ export default function ContentCodePage() {
             header: "操作",
             cell: ({ row }) => (
                 <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(row.original)} title="编辑">
-                        <PencilIcon className="size-4" />
-                    </Button>
-                    {/* <Button variant="ghost" size="sm" onClick={() => handleDelete(row.original.id)} title="删除">
-                        <Trash2Icon className="size-4 text-destructive" />
-                    </Button> */}
+                    <TipButton view={<PencilIcon className="size-4" />} label="编辑命令" onClick={() => openEdit(row.original)} />
                     <DeleteDialog view={<Trash2Icon className="size-4 text-destructive" />} label={'确认删除此命令，删除后可去操作日志中恢复操作'}  onDelete={()=>handleDelete(row.original.id)}/> 
                 </div>
             ),
@@ -343,37 +341,40 @@ export default function ContentCodePage() {
                     </ScrollArea>
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col gap-2">
-                    <span className="text-sm font-medium">
-                       <span className="text-muted-foreground">设备命令管理</span> 
-                    </span>
+                    
                     <div className="flex flex-col gap-2">
                         <div className="flex justify-between items-center gap-2">
                             <span className="text-sm font-medium">
-                                <span className="text-muted-foreground">展厅/展项 — </span>{selected?.label}
+                                <span className="text-muted-foreground">设备命令管理 — </span>{selected?.label}
                             </span>
-                            <div className="flex items-center gap-2">
-                                {selectedIds.size > 0 && (
-                                    <Button
-                                        variant="destructive"
-                                        size="default"
-                                        onClick={() => handleBatchDelete()}
-                                    >
-                                        批量删除 ({selectedIds.size})
-                                    </Button>
-                                )}
-                                <Button onClick={openBatchAdd}><PlusIcon className="mr-1 size-4" /> 批量新增</Button>
-                                <Button onClick={openAdd}><PlusIcon className="mr-1 size-4" /> 新增命令</Button>
-                            </div>
+
                         </div>
-                        <ScrollArea className="h-[calc(100dvh-240px)] border border-border px-4 py-2 rounded-lg">
+                        <ScrollArea className="h-[calc(100dvh-200px)] border border-border px-4 py-4 rounded-lg">
                             <DataTable
+                                tableRef={tableRef}
                                 columns={columns}
                                 data={data}
-                                loading={loading}
+                                loading={false}
                                 searchPlaceholder="搜索名称/代码/IP..."
                                 pageSize={15}
                                 onSelectionChange={handleSelectionChange}
-                            />
+                                children={
+                                    <div className="flex items-center gap-2">
+                                        {selectedIds.size > 0 && (
+                                            <Button
+                                                variant="destructive"
+                                                size="default"
+                                                onClick={() => handleBatchDelete()}
+                                            >
+                                                批量删除 ({selectedIds.size})
+                                            </Button>
+                                        )}
+                                        <Button variant="outline" onClick={openBatchAdd}><ListPlus className="size-4" /> 批量新增</Button>
+                                        <Button variant="outline" onClick={openAdd}><PlusIcon className="size-4" /> 新增命令</Button>
+                                        <Button variant="outline" size='icon' onClick={()=>{fetchData(selected);tableRef.current?.resetPageIndex();}}><RefreshCw className="size-4" /></Button>
+                                    </div>
+                                }
+                            ></DataTable>
                         </ScrollArea>
                     </div>
                 </div>

@@ -57,7 +57,7 @@ import {
 	getPavilionList, addPavilion, updatePavilion, deletePavilion,
 	getMachineList, addMachine, updateMachine, deleteMachine,updateMachineLink,
 	getExhibitList, addExhibit, updateExhibit, deleteExhibit,updateExhibitLink,
-	getContentList, addContent, updateContent, deleteContent, updateContentDownload,
+	getContentList, addContent, updateContent, deleteContent, updateContentDownload,updateContentDefault
 } from "@/api/exhibition";
 
 import { 
@@ -454,6 +454,17 @@ export default function ManagePage() {
 			toast.success("指令已发送");
 		} catch (e: unknown) {
 			toast.error(e instanceof Error ? e.message : "发送失败");
+		}
+	};
+
+	// --- 内容 默认切换 --- 
+	const handleContentDefaultChange = async (node: FlowNodeData) => {
+		try {
+			const res = await updateContentDefault({ id: node.id, default: 1 });
+			toast.success(res?.msg || "已设为默认");
+			fetchTree();
+		} catch (e: unknown) {
+			toast.error(e instanceof Error ? e.message : "设置失败");
 		}
 	};
 
@@ -876,6 +887,7 @@ export default function ManagePage() {
 					onExhibitControlEdit={handleExhibitControlEdit}
 					onExhibitCommandEdit={handleExhibitCommandEdit}
 					onContentDownload={handleContentDownload}
+					onContentDefaultChange={handleContentDefaultChange}
 					onDeviceProbe={handleDeviceProbe}
 					onRefresh={fetchTree}
 				/>

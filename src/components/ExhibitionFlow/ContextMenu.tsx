@@ -48,9 +48,9 @@ const FlowContextMenu = ({ top, left, right, bottom, groups, onClose }: FlowCont
 
     return (
         <div style={style} className="absolute z-100 w-auto h-auto">
-            <Command className="max-w-sm rounded-lg border">
+            <Command className="max-w-sm h-full rounded-lg border">
                 <CommandInput placeholder="输入命令或搜索..." />
-                <CommandList className="scrollbar-thin ">
+                <CommandList className="scrollbar-thin max-h-80">
                     <CommandEmpty>未找到结果。</CommandEmpty>
                     {groups.map((group, index) => (
                         <div key={group.heading}>
