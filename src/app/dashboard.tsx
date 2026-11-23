@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom";
 
-import { TrendingUpIcon, UploadCloudIcon, HardDriveIcon, CodeXml, ContainerIcon, CircuitBoard, Waypoints, FileBox, CodeIcon, Share2, ScanEyeIcon, InspectIcon, ChevronRightIcon, MousePointerClick } from "lucide-react";
+import { TrendingUpIcon, UploadCloudIcon, HardDriveIcon, CodeXml, ContainerIcon, CircuitBoard, Waypoints, FileBox, CodeIcon, Share2, ScanEyeIcon, InspectIcon, ChevronRightIcon, MousePointerClick, BlocksIcon, HomeIcon } from "lucide-react";
 
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -199,7 +199,8 @@ export default function Page() {
                                 <span className="text-sm text-muted-foreground">点击按钮快捷跳转</span>
                             </CardHeader>
                             <CardContent className="grid grid-cols-1 gap-4 @sm/main:grid-cols-2 @xl/main:grid-cols-4 @3xl/main:grid-cols-6 @6xl/main:grid-cols-8 @7xl/main:grid-cols-12 ">
-                                <Button variant="outline" className="w-full h-20 drop-shadow-xl" onClick={()=>navigate("/server/main", { replace: true })}><CodeXml/> 首页</Button>
+                                <Button variant="outline" className="w-full h-20 drop-shadow-xl" onClick={()=>navigate("/server/main", { replace: true })}><HomeIcon /> 首页</Button>
+                                <Button variant="outline" className="w-full h-20 drop-shadow-xl" onClick={()=>navigate("/server/quickcreate", { replace: true })}><BlocksIcon/> 快捷创建</Button>
                                 <Button variant="outline" className="w-full h-20 drop-shadow-xl" onClick={()=>navigate("/server/pme", { replace: true })}><ContainerIcon/> 展项管理</Button>
                                 <Button variant="outline" className="w-full h-20 drop-shadow-xl" onClick={()=>navigate("/server/content", { replace: true })}><FileBox /> 内容管理</Button>
                                 <Button variant="outline" className="w-full h-20 drop-shadow-xl" onClick={()=>navigate("/server/contentcode", { replace: true })}><CodeIcon/> 内容命令</Button>

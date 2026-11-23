@@ -46,6 +46,8 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+    /* 旧项目遗留的旋转动画（quick-create 的刷新图标在用） */
+    --animate-rotate360: rotate360 3s linear infinite;
 }
 
 :root {
@@ -128,4 +130,36 @@
     @apply font-sans;
   }
   
+}
+
+@keyframes rotate360 {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── 旧项目遗留的自定义滚动条工具类 ──
+   之前从未定义，导致 quick-create / main 等页面里的 scrollbar-hide / scrollbar-line 不生效。 */
+
+@utility scrollbar-hide {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility scrollbar-line {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, currentColor 35%, transparent) transparent;
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: color-mix(in oklab, currentColor 35%, transparent);
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }

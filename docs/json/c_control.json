@@ -1,0 +1,197 @@
+[
+    {
+        "label": "待机",
+        "show": true,
+        "sort": 1,
+        "children": [],
+        "content_code": [
+            {
+                "id": 77,
+                "label": "指令解释？",
+                "name": "待机",
+                "format": 1,
+                "protocal": 4,
+                "ip": "192.168.1.102",
+                "port": 10450,
+                "code": "code_default",
+                "delay": 0
+            }
+        ],
+        "device_code": []
+    },
+    {
+        "label": "按钮名称",
+        "show": true,
+        "sort": 1,
+        "children": [
+            {
+                "label": "二级按钮名称",
+                "show": true,
+                "sort": 1,
+                "children": [
+                    {
+                        "label": "三级按钮名称",
+                        "show": true,
+                        "sort": 1,
+                        "children": [],
+                        "content_code": [],
+                        "device_code": []
+                    },
+                    {
+                        "label": "三级按钮名称",
+                        "show": true,
+                        "sort": 1,
+                        "children": [
+                            {
+                                "label": "四级按钮名称",
+                                "show": true,
+                                "sort": 1,
+                                "children": [],
+                                "content_code": [],
+                                "device_code": []
+                            }
+                        ],
+                        "content_code": [],
+                        "device_code": []
+                    }
+                ],
+                "content_code": [],
+                "device_code": []
+            },
+            {
+                "label": "二级按钮名称",
+                "show": true,
+                "sort": 1,
+                "children": [],
+                "content_code": [],
+                "device_code": []
+            }
+        ],
+        "content_code": [
+            {
+                "id": 78,
+                "label": "指令解释？",
+                "name": "主页",
+                "format": 1,
+                "protocal": 4,
+                "ip": "192.168.1.102",
+                "port": 10450,
+                "code": "code_zhuxi",
+                "delay": 0
+            }
+        ],
+        "device_code": []
+    },
+    {
+        "label": "按钮名称",
+        "show": true,
+        "sort": 1,
+        "children": [],
+        "content_code": [
+            {
+                "id": 152,
+                "label": "指令解释？",
+                "name": "老船视频",
+                "format": 1,
+                "protocal": 4,
+                "ip": "192.168.1.102",
+                "port": 10450,
+                "code": "code_laochuan",
+                "delay": 0
+            }
+        ],
+        "device_code": []
+    },
+    {
+        "label": "按钮名称",
+        "show": true,
+        "sort": 1,
+        "children": [],
+        "content_code": [
+            {
+                "id": 153,
+                "label": "指令解释？",
+                "name": "领导题词",
+                "format": 1,
+                "protocal": 4,
+                "ip": "192.168.1.102",
+                "port": 10450,
+                "code": "code_mingti",
+                "delay": 0
+            }
+        ],
+        "device_code": []
+    },
+    {
+        "label": "按钮名称",
+        "show": true,
+        "sort": 1,
+        "children": [
+            {
+                "label": "中文",
+                "show": true,
+                "sort": 1,
+                "children": [],
+                "content_code": [
+                    {
+                        "id": 154,
+                        "label": "指令解释？",
+                        "name": "熊猫讲解-中文",
+                        "format": 1,
+                        "protocal": 4,
+                        "ip": "192.168.1.102",
+                        "port": 10450,
+                        "code": "code_cn_video",
+                        "delay": 0,
+                        "sort": 0
+                    }
+                ],
+                "device_code": []
+            },
+            {
+                "label": "英文",
+                "show": true,
+                "sort": 1,
+                "children": [],
+                "content_code": [
+                    {
+                        "id": 155,
+                        "label": "指令解释？",
+                        "name": "熊猫讲解-英文",
+                        "format": 1,
+                        "protocal": 4,
+                        "ip": "192.168.1.102",
+                        "port": 10450,
+                        "code": "code_eng_video",
+                        "delay": 0,
+                        "sort": 0
+                    }
+                ],
+                "device_code": []
+            },
+            {
+                "label": "关闭",
+                "show": true,
+                "sort": 1,
+                "children": [],
+                "content_code": [
+                    {
+                        "id": 156,
+                        "label": "指令解释？",
+                        "name": "熊猫讲解-关闭",
+                        "format": 1,
+                        "protocal": 4,
+                        "ip": "192.168.1.102",
+                        "port": 10450,
+                        "code": "code_videoClose",
+                        "delay": 0,
+                        "sort": 0
+                    }
+                ],
+                "device_code": []
+            }
+        ],
+        "content_code": [],
+        "device_code": []
+    }
+]

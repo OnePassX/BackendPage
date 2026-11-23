@@ -755,16 +755,16 @@ function ExhibitionFlowInner({
         );
     }
 
-    if (!loading && initialized && !hasData) {
-        return (
-            <div className="flex items-center justify-center h-full min-h-100 rounded-lg border border-dashed border-border text-muted-foreground">
-                <div className="text-center">
-                    <FileIcon className="mx-auto size-8 mb-2 opacity-40" />
-                    <p className="text-sm">暂无展览结构数据</p>
-                </div>
-            </div>
-        );
-    }
+    // if (!loading && initialized && !hasData) {
+    //     return (
+    //         <div className="flex items-center justify-center h-full min-h-100 rounded-lg border border-dashed border-border text-muted-foreground">
+    //             <div className="text-center">
+    //                 <FileIcon className="mx-auto size-8 mb-2 opacity-40" />
+    //                 <p className="text-sm">暂无展览结构数据</p>
+    //             </div>
+    //         </div>
+    //     );
+    // }
 
     return (
         <FlowActionsContext.Provider value={actions}>

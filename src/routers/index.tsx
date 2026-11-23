@@ -31,6 +31,8 @@ import ProcessPage from "@/app/model/process";
 
 import LogPage from "@/app/log/index";
 
+import QuickCreate from "@/app/quick-create";
+
 
 const routers = [
     { title: '后台登录', path: '/', element: <BackendLogin /> },
@@ -72,6 +74,8 @@ const routers = [
         { path: 'process', element: <ProcessPage /> },
         
         { path: 'backendlog', element: <LogPage /> },
+
+        { path: 'quickcreate', element: <QuickCreate /> },
         // Wildcard: catches any /server/:path not matched above
         // Shows the menu item name from API, or "页面组件待实现"
         { path: '*', element: <MenuRoutePage /> },
