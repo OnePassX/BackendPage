@@ -35,6 +35,12 @@ export default defineConfig({
         target: 'http://192.168.4.43:8004/media',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/media/, '')
+      },
+      // noVNC 远程画面：浏览器 ws -> websockify（控制服务器 6080），生产由 nginx 做同样的反代
+      '/websockify':{
+        target: 'http://192.168.4.43:6080',
+        changeOrigin: true,
+        ws: true,
       }
     }
   },

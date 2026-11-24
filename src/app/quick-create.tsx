@@ -38,6 +38,7 @@ import {
 import { ControlNodeForm, type ControlNode } from "@/components/quick-create/forms/ControlNodeForm";
 import { ExhibitLinkPanel } from "@/components/quick-create/ExhibitLinkPanel";
 import { ContentControlPanel } from "@/components/quick-create/ContentControlPanel";
+import { VncPanel } from "@/components/quick-create/vnc/VncPanel";
 import { HiPlusSm,HiOutlineMinusSm,HiOutlineVolumeOff,HiOutlineVolumeUp } from "react-icons/hi";
 import { LuPanelBottomOpen, LuPanelTopOpen, LuPenLine, LuSave } from "react-icons/lu";
 import { Separator } from "@/components/ui/separator";
@@ -972,11 +973,15 @@ const Index = () =>{
                                     <TabsTrigger value="device" className="flex-1 text-base dark:data-active:bg-purple-700 data-active:bg-white">设备命令</TabsTrigger>
                                     {   
                                         showEditActions &&
-                                        <><TabsTrigger value="control" className="flex-1 text-base dark:data-active:bg-purple-700 data-active:bg-white">内容命令</TabsTrigger>
-                                        <TabsTrigger value="link" className="flex-1 text-base dark:data-active:bg-purple-700 data-active:bg-white">快捷控制</TabsTrigger></>
+                                        <>
+                                        <TabsTrigger value="control" className="flex-1 text-base dark:data-active:bg-purple-700 data-active:bg-white">内容命令</TabsTrigger>
+                                        <TabsTrigger value="link" className="flex-1 text-base dark:data-active:bg-purple-700 data-active:bg-white">快捷控制</TabsTrigger>
+                                        <TabsTrigger value="vnc" className="flex-1 text-base dark:data-active:bg-purple-700 data-active:bg-white">远程画面</TabsTrigger>
+                                        </>
                                     }
                                     <TabsTrigger value="commentary" className="flex-1 text-base dark:data-active:bg-purple-700 data-active:bg-white">讲解词</TabsTrigger>
                                 </TabsList>
+                                {/* 内容控制 */}
                                 <TabsContent value="content" className="w-full h-[calc(100%-3.6rem)]">
                                     <div className="bg-secondary shadow-md  rounded-lg w-full h-full flex flex-row justify-center items-center overflow-hidden">
                                         {/* 内容列表 */}
@@ -1048,6 +1053,7 @@ const Index = () =>{
                                         </ResizablePanelGroup>
                                     </div>
                                 </TabsContent>
+                                {/* 设备控制 */}
                                 <TabsContent value="device" className="w-full h-[calc(100%-3.5rem)]">
                                     <div className="bg-secondary shadow-md  rounded-lg w-full h-full flex flex-row justify-center items-center overflow-hidden">
                                         {/* 设备列表 */}
@@ -1121,6 +1127,7 @@ const Index = () =>{
                                         </div>
                                     </div>
                                 </TabsContent>
+                                {/* 快捷控制 */}
                                 <TabsContent value="link" className="w-full h-[calc(100%-3.5rem)]">
                                     <ExhibitLinkPanel
                                         exhibitId={Number(Array.from(currentExhibit)[0]) || null}
@@ -1135,7 +1142,7 @@ const Index = () =>{
                                         devices={deviceList.map((d: any) => ({ id: d.id, name: d.deviceName, ip: d.deviceIp }))}
                                     />
                                 </TabsContent>
-
+                                {/* 内容命令 */}
                                 <TabsContent value="control" className="w-full h-[calc(100%-3.5rem)]">
                                     <ContentControlPanel
                                         exhibitId={Number(Array.from(currentExhibit)[0]) || null}
@@ -1149,10 +1156,22 @@ const Index = () =>{
                                         color={colorVariants[color]}
                                     />
                                 </TabsContent>
-
+                                {/* 远程画面 */}
+                                <TabsContent value="vnc" className="w-full h-[calc(100%-3.5rem)]">
+                                    <VncPanel
+                                        devices={deviceList}
+                                        exhibitName={
+                                            tree
+                                                .flatMap((p: any) => p.data ?? [])
+                                                .flatMap((m: any) => m.data ?? [])
+                                                .find((e: any) => String(e.id) === String(Array.from(currentExhibit)[0]))?.name
+                                        }
+                                    />
+                                </TabsContent>
+                                {/* 讲解词 */}
                                 <TabsContent value="commentary" className="w-full h-[calc(100%-3.5rem)]">
                                     <div className="bg-[#F9F9FA] shadow-md  rounded-lg w-full h-full flex flex-row justify-center items-center overflow-hidden">
-                                        {/* 讲解词 */}
+                                        
                                         <div className={`flex-1 relative h-full w-auto overflow-hidden`}>
                                             <div className="absolute top-0 left-0 w-full h-20 flex flex-col justify-center items-center gap-3 bg-[#F9F9FA] z-10">
                                                 <div className={`w-full flex flex-row justify-between items-center px-3 gap-2 overflow-hidden ${colorVariants[color][0]}`}>

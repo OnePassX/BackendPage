@@ -1,0 +1,14 @@
+# 放进 nginx 前端站点所在的 server 块。
+# 前端以同源 ws://<页面host>/websockify?token=<设备ID> 连接，
+# nginx 把它反代到控制服务器本机的 websockify（6080）。
+# 现场页面是 http，无需 wss/TLS。
+
+location /websockify {
+    proxy_pass http://127.0.0.1:6080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+}
