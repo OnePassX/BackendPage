@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { MdDesktopWindows, MdFullscreen, MdFullscreenExit } from "react-icons/md";
+import {
+    MdDesktopWindows,
+    MdFullscreen,
+    MdFullscreenExit,
+    MdKeyboard,
+    MdLock,
+} from "react-icons/md";
 import { get_Global_Device } from "@/api/quick.js";
 import { useVncSession, type VncStatus } from "./useVncSession";
 
@@ -51,6 +57,7 @@ const STATUS_META: Record<VncStatus, { label: string; className: string }> = {
     connecting: { label: "连接中", className: "bg-blue-500/15 text-blue-600" },
     connected: { label: "已连接", className: "bg-emerald-500/15 text-emerald-600" },
     "need-password": { label: "需要密码", className: "bg-amber-500/15 text-amber-600" },
+    reconnecting: { label: "重连中", className: "bg-amber-500/15 text-amber-600" },
     disconnected: { label: "未连接", className: "bg-gray-500/15 text-gray-500" },
     error: { label: "连接失败", className: "bg-red-500/15 text-red-500" },
 };
@@ -118,8 +125,18 @@ export function VncPanel({ devices, exhibitName }: VncPanelProps) {
         });
     }, [allDevices]);
 
-    const { containerRef, status, error, desktopName, connect, disconnect, setScaleViewport } =
-        useVncSession();
+    const {
+        containerRef,
+        status,
+        error,
+        desktopName,
+        viewOnly,
+        connect,
+        disconnect,
+        setScaleViewport,
+        setViewOnly,
+    } = useVncSession();
+
     const [scaleViewport, setScaleViewportState] = useState(true);
     const [fullscreen, setFullscreen] = useState(false);
     const panelRef = useRef<HTMLDivElement | null>(null);
@@ -127,6 +144,7 @@ export function VncPanel({ devices, exhibitName }: VncPanelProps) {
     const selectedDevice = allDevices.find((d) => d.id === selectedId) ?? null;
     const connected = status === "connected";
     const busy = status === "connecting";
+    const reconnecting = status === "reconnecting";
 
     useEffect(() => {
         const onFullscreenChange = () => setFullscreen(document.fullscreenElement === panelRef.current);
@@ -136,7 +154,7 @@ export function VncPanel({ devices, exhibitName }: VncPanelProps) {
 
     const handleSelect = (device: VncDevice) => {
         if (device.id === selectedId) return;
-        if (connected || busy) disconnect();
+        if (connected || busy || reconnecting) disconnect();
         setSelectedId(device.id);
     };
 
@@ -161,6 +179,10 @@ export function VncPanel({ devices, exhibitName }: VncPanelProps) {
         } else {
             void panelRef.current?.requestFullscreen?.();
         }
+    };
+
+    const handleToggleViewOnly = () => {
+        setViewOnly(!viewOnly);
     };
 
     return (
@@ -194,7 +216,7 @@ export function VncPanel({ devices, exhibitName }: VncPanelProps) {
                     />
                 </div>
                 <div className="shrink-0 border-t border-[#888888]/20 px-3 py-2 text-[11px] leading-4 text-muted-foreground">
-                    仅电脑主机 / 一体机，第一版只读
+                    仅电脑主机 / 一体机 · 默认只读，可切换操作
                 </div>
             </div>
 
@@ -227,9 +249,20 @@ export function VncPanel({ devices, exhibitName }: VncPanelProps) {
                             variant="outline"
                             size="sm"
                             disabled={!selectedDevice || busy}
-                            onClick={connected ? disconnect : handleConnect}
+                            onClick={connected || reconnecting ? disconnect : handleConnect}
                         >
-                            {connected ? "断开" : "连接"}
+                            {connected ? "断开" : reconnecting ? "停止重连" : "连接"}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            disabled={!connected}
+                            title={viewOnly ? "当前只读，点击接管鼠标键盘" : "当前可操作，点击切回只读"}
+                            onClick={handleToggleViewOnly}
+                        >
+                            {viewOnly ? <MdLock size={15} /> : <MdKeyboard size={15} />}
+                            {viewOnly ? "只读" : "可操作"}
                         </Button>
                         <Button
                             variant="outline"
@@ -260,16 +293,23 @@ export function VncPanel({ devices, exhibitName }: VncPanelProps) {
                             <div className="text-sm text-white/80">
                                 {busy
                                     ? "正在连接远程设备…"
-                                    : selectedDevice
-                                      ? `${selectedDevice.name}（${selectedDevice.ip}）`
-                                      : "请选择左侧设备"}
+                                    : reconnecting
+                                      ? "连接已断开，正在自动重连…"
+                                      : selectedDevice
+                                        ? `${selectedDevice.name}（${selectedDevice.ip}）`
+                                        : "请选择左侧设备"}
                             </div>
                             {error && <div className="max-w-md text-xs text-red-400">{error}</div>}
-                            {!busy && selectedDevice && (
+                            {!busy && !reconnecting && selectedDevice && (
                                 <Button size="sm" variant="secondary" onClick={handleConnect}>
                                     {status === "error" || status === "disconnected" ? "重新连接" : "连接画面"}
                                 </Button>
                             )}
+                        </div>
+                    )}
+                    {connected && viewOnly && (
+                        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[11px] text-white/80">
+                            只读模式 · 点击工具栏「只读」接管鼠标键盘
                         </div>
                     )}
                 </div>

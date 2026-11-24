@@ -424,11 +424,12 @@ location /websockify {
 | 阶段 | 内容 | 预估 | 验收 |
 |---|---|---|---|
 | **P0 最小可用** ✅ 前端已完成 | 装依赖；`useVncSession` + `VncPanel`（设备列表/连接/断开/全屏/缩放）；Vite ws 代理；控制服务器装 websockify + `IpPortTokenPlugin`；用一台已装 VNC 的测试机联调 | 0.5–1 天 | 能在浏览器看到测试机桌面（第一版只读） |
-| **P1 体验完善** | 开放鼠标键盘（`viewOnly=false`）、自动重连、Ctrl+Alt+Del / 剪贴板 / 画质 / 截图、Tab 生命周期（`forceMount`）等 | 1–2 天 | 切设备/断网/密码错误/切 Tab 均有明确反馈，无内存泄漏 |
+| **P1 体验完善** ✅ 已完成（2026-11-24） | 只读/可操作切换、自动重连（最多 3 次，1s/2s/4s 退避；认证类错误不重试）；「更多」菜单（画质/Ctrl+Alt+Del/截屏/剪贴板）按现场要求不做；Tab `forceMount` 暂缓（见 §16） | 1–2 天 | 切设备/断网/密码错误均有明确反馈，无内存泄漏 |
 | **P2 后端与部署** | 模型字段 + 迁移、设备表单字段、`/api/device/vnc/info`（密码下发）、NSSM 服务、nginx 反代 | 1–2 天 | 新装 VNC 的设备在管理页勾选后即可连接，无需手工改任何映射文件 |
 | **P3 可选** | 短时 JWT token、审计日志、多设备画面墙、截图存档 | 按需 | — |
 
-> 原 P1 中的「整馆设备合并、在线状态、状态机/重连/错误分类、Vite ws 代理、`VITE_VNC_WS_BASE`」已在 P0 一并完成。
+> 原 P1 中的「整馆设备合并、在线状态、状态机/错误分类、Vite ws 代理、`VITE_VNC_WS_BASE`」已在 P0 一并完成；
+> P1 的键鼠接管、自动重连已于 2026-11-24 实现；原计划的画质/Ctrl+Alt+Del/截屏/剪贴板已按现场要求移除，记录见 §16。
 
 ---
 
@@ -450,6 +451,13 @@ location /websockify {
 - [ ] 全屏进入/退出正常；适应窗口与 1:1 切换正常
 - [ ] 切换设备、切换 Tab、离开页面时连接被正确释放（后台任务管理器无残留 WS）
 - [ ] 阶段二：管理页勾选/取消「启用远程桌面」后前端自动可连/不可连（不再依赖任何映射文件）
+
+**P1 已完成（2026-11-24）**
+
+- [x] 只读/可操作切换：`rfb.viewOnly` 动态切换，无需重连
+- [x] 自动重连：非主动断开时最多重试 3 次（延迟 1s/2s/4s），状态显示「重连中」；「停止重连」可中断；认证类错误不重试
+- [x] 已按现场要求移除「更多」菜单（画质 / Ctrl+Alt+Del / 截屏 / 剪贴板 / 释放键鼠）
+- [x] `tsc` 仍为 6 个既有 TS6133 无新增；`npm run lint` 0 error / 155 warnings（与基线一致）
 
 ---
 
@@ -675,3 +683,58 @@ websockify 不再读取 `vnc_tokens.cfg`，改用一个自定义 token 插件，
   `JSONTokenApi`（websockify 内置插件，接一个小接口校验），前端只需把 token 换回设备 ID/签名串。
 - **端口**：展项机 RealVNC 端口必须是 5900–5909（默认 5900）；改端口需同时改插件 `ALLOWED_PORTS`。
 
+---
+
+## 16. P1 实现记录（2026-11-24）
+
+### 16.1 最终范围
+
+按现场要求，P1 只保留两项体验能力；原「更多」菜单中的画质 / Ctrl+Alt+Del / 截屏 / 剪贴板 / 释放键鼠均已移除（不再显示入口，相关代码一并删除）：
+
+| 功能 | 实现要点 | 入口 |
+|---|---|---|
+| 鼠标键盘接管 | 工具栏「只读/可操作」切换 `rfb.viewOnly`；默认仍为只读（现场参数第 5 条），连接后可随时切换，无需重连 | 工具栏按钮（`MdLock` / `MdKeyboard`） |
+| 自动重连 | 非用户主动断开时最多重试 3 次，延迟 1s / 2s / 4s；期间状态为「重连中」并显示「x 秒后自动重连（n/3）」；「停止重连」按钮可中断；超过 3 次进入 `error`。认证类错误（`securityfailure` / `credentialsrequired`）**不自动重连**，避免把 RealVNC 的失败次数刷到 IP 黑名单 | 断开事件自动触发 |
+
+画质固定为 noVNC 均衡档（`qualityLevel = 6`、`compressionLevel = 2`），不再暴露切换入口。
+
+### 16.2 落地文件
+
+| 文件 | 改动 |
+|---|---|
+| `src/components/quick-create/vnc/useVncSession.ts` | 状态机增加 `reconnecting`；`MAX_AUTO_RETRY=3`、`RETRY_DELAYS=[1000,2000,4000]`、`HANDSHAKE_TIMEOUT=8000`；断开事件区分「主动断开 / 异常断开」并触发重连定时器；认证类错误（`fatalRef`）不重连；新增 `setViewOnly`；卸载时清理重连定时器并断开；移除画质/剪贴板/截屏/CAD 相关状态与方法 |
+| `src/components/quick-create/vnc/VncPanel.tsx` | 工具栏新增「只读/可操作」切换与「停止重连」状态；未连接遮罩支持「重连中」文案；已连接且只读时画面底部显示只读提示 pill；移除「更多」下拉菜单、画质/CAD/截屏/剪贴板/粘贴 Dialog 及相关处理 |
+| 后端 / 依赖 | 无改动（仍为 `@novnc/novnc@1.7.0`、websockify 0.13.0 + `IpPortTokenPlugin`） |
+
+### 16.3 交互约定
+
+- 连接中（`connecting`）时「连接」按钮禁用；已连接时为「断开」；自动重连中时为「停止重连」；
+- 「只读/可操作」「适应窗口/1:1」在未连接时禁用；「全屏」始终可用；
+- 切换设备、切换 Tab、离开页面均会断开当前连接（Tab 切换会卸载 `VncPanel`，属当前设计，见 16.5）；
+- 只读模式下画面底部有提示 pill；点击工具栏「只读」进入可操作模式后 noVNC 会捕获鼠标键盘。
+
+### 16.4 静态验证
+
+- `node node_modules/typescript/bin/tsc -p tsconfig.app.json --noEmit --incremental false`：6 个既有 TS6133，无新增；
+- `npm run lint`：`Found 155 warnings and 0 errors`（与基线 `5be7bb8` 一致）；
+- Vite dev 冒烟：`VncPanel.tsx` 与 `useVncSession.ts` 转译返回 200，noVNC 预构建 200，`/websockify` 代理可达。
+
+### 16.5 现场联调建议（按顺序）
+
+1. **画面与键鼠**：连接后先确认画面正常；点「只读」→「可操作」，在画面内点击一次（noVNC 会捕获键盘），操作远程鼠标键盘。
+2. **自动重连**：连接后停掉控制服务器上的 websockify（或断开展项机网络）→ 状态应变「重连中」并显示倒计时；恢复 websockify 后应自动连回；再次断开时点「停止重连」验证可中断。
+3. **密码错误**：可临时改错密码验证——应直接提示「安全验证失败」，且不会连续重试（避免触发 RealVNC 黑名单）。
+4. **生命周期**：切设备 / 切到其它 Tab / 关闭页面后，DevTools Network → WS 中不应有残留连接。
+
+### 16.6 已知限制与未做项
+
+- **Tab `forceMount` 未做**：切 Tab 保持连接需要处理隐藏容器（`display:none`）下 canvas 尺寸为 0 的缩放异常，收益低、风险高，本期不做；如后续需要，可改 `<TabsContent forceMount>` 并在重新可见时调用 `setScaleViewport` / 重设容器尺寸。
+- **「更多」菜单已按现场要求移除**：画质 / Ctrl+Alt+Del / 截屏 / 远程剪贴板 / 粘贴文本 / 释放键鼠都不再提供；如后续需要，可基于 noVNC 的 `qualityLevel` 映射、`sendCtrlAltDel()`、`toDataURL()`、`clipboardPasteFrom()`、`blur()` 重新实现。
+- **密码仍为前端常量**（`12345678`，`VITE_VNC_PASSWORD` 可覆盖），P2 改由后端接口下发；届时需同时删除前端常量。
+- **未提交 git**：本次 P1 改动仅在工作区，等待确认后再提交。
+
+### 16.7 变更文件
+
+- `src/components/quick-create/vnc/useVncSession.ts`（重写）
+- `src/components/quick-create/vnc/VncPanel.tsx`（重写）
+- `docs/design/quick-create-vnc.md`（本节及 §10/§11 更新）

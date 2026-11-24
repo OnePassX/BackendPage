@@ -351,7 +351,7 @@ const Index = () =>{
                 setTree(list)
                 // 当前展馆失效（首次加载 / 被删除）时回落到第一个
                 setCurrentPavilion((prev: number | null) => {
-                    if (prev != null && list.some((p: any) => p.id === prev)) return prev
+                    if (prev != null && list.some((p: any) => p.id === prev )) return prev
                     return list[0]?.id ?? null
                 })
                 // 派生展区列表（带上所属展馆 id，供「添加展区」使用）
@@ -364,7 +364,7 @@ const Index = () =>{
                 setExhibitList(machines)
             }
         })
-    } 
+    }
 
     // 改变svg颜色和大小
     const changeIconColor = (val, color='#201f2c', size = '100%') => {
@@ -702,6 +702,7 @@ const Index = () =>{
             {/* 展厅切换条：点击切换下方展区/展项列表 */}
             <div className="h-16 w-full flex flex-row gap-4">
                 {tree.length > 0 && tree.map((p: any) => (
+                    p.show == 1 &&
                     <div
                         key={p.id}
                         onClick={() => onPavilionChange(p.id)}
@@ -729,6 +730,7 @@ const Index = () =>{
                             </Button>
                         )}
                     </div>
+
                 ))}
                 {showEditActions && (
                     <Button
